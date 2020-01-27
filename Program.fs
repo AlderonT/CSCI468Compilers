@@ -1,6 +1,4 @@
-﻿// Learn more about F# at http://fsharp.org
-
-open System
+﻿open System
 
 module Parser =
     
@@ -18,7 +16,6 @@ module Parser =
         pos: Position
         sourceLine: string
         consumedInput : bool
-        cut : bool
     }
 
     type InputState =
@@ -94,6 +91,7 @@ module Parser =
 
     let run (Parser(_,p)) input = p input                         //Parser(p) unwraps p this is called an "active pattern"
 
+
     //We are taking a function like; f:('a -> Parser<'b>) and making a function parser p:Parser<'a> and returning a parser of type Parser<'b>
     let bindP f (Parser(_,p)) =
         let label = "unknown"
@@ -118,20 +116,61 @@ module Parser =
                 Failure (newLabel,err)
             | s -> s
         )
-
+    let getLabel (Parser(lbl,_)) = lbl
     let (<?>) = setLabel
 
     let returnP (x:'a) =                             //Lifts a value into the parser world
         Parser (string (box x) ,fun input -> Success (x,input)) //parser always suceeds and gives you the value you gave it
 
+    let pfail lbl msg =
+        Parser(lbl,fun input ->
+            Failure(lbl,{msg = msg; pos = input.Position; sourceLine = input.SourceLine; consumedInput = true})
+        )
+
+    let delayP f =
+        Parser("delay",fun input ->
+            let p = f()
+            run p input
+        )
+
+    let ignoreP (Parser(lbl,p)) =
+        Parser(lbl,fun input ->
+            match p input with
+            | Failure (lbl,err) -> Failure(lbl,err)
+            | Success (_,input') -> Success((),input')
+        )    
+
+    type ParserBuilder() =
+        member this.Return x = returnP x
+        member this.Bind(p,f) = bindP f p
+
+        member this.Delay f = delayP f
+        member this.Zero() = returnP ()
+        member this.ReturnFrom p = p
+        member this.Combine (Parser(_,pUnit),Parser(_,pNext)) =
+            Parser("combine",fun input ->
+                match pUnit input with
+                | Failure (lbl,err) -> Failure (lbl,err)
+                | Success ((),input') -> pNext input'
+            )
+
+    let parser = ParserBuilder()
+
+    // let andThen p1 p2 =
+    //     p1 >>= (fun p1Result ->
+    //     p2 >>= (fun p2Result ->
+    //         returnP (p1Result,p2Result) ))
+    //     //<?> sprintf"%s and %s" p1.Label p2.Label
     let andThen p1 p2 =
-        p1 >>= (fun p1Result ->
-        p2 >>= (fun p2Result ->
-            returnP (p1Result,p2Result) ))
-        //<?> sprintf"%s and %s" p1.Label p2.Label
+        parser {
+            let! r1 = p1                    //let! acts like bind allowing us to pull the function out fo the parser world
+            let! r2 = p2
+            return r1,r2
+        }
 
     let (.>>.) = andThen        //infix operator 
 
+    // special case can not use parser builder because we are backtracking on input
     let orElse (p1:_ Parser) (p2:_ Parser) =
         Parser("unknown",fun input ->
             match p1.ParseFn input with
@@ -143,6 +182,7 @@ module Parser =
 
     let (<|>) = orElse
 
+    // special case because we are implementing a base level parser
     let satisfy predicate label =
         Parser ( label, fun input ->
             match (input:InputState).NextChar() with
@@ -152,7 +192,6 @@ module Parser =
                     pos = input.Position
                     sourceLine = input.SourceLine
                     consumedInput = false
-                    cut = false
                 } 
                 Failure (label, err)
             | Some (ch,remainingInput) ->
@@ -164,7 +203,6 @@ module Parser =
                         pos = input.Position
                         sourceLine = input.SourceLine
                         consumedInput = false
-                        cut = false
                     } 
                     Failure (label,err)
         )
@@ -212,7 +250,6 @@ module Parser =
                     pos = input.Position
                     sourceLine = input.SourceLine
                     consumedInput = false
-                    cut = false
                 }
                 Failure (regex, err)
             | Some (m,remainingInput) -> Success(m,remainingInput)
@@ -238,44 +275,30 @@ module Parser =
         Parser(label,fun input -> Success(parseZeroOrMore parser input))
          
     let many1 p =
-        p      >>= (fun head ->
-        many p >>= (fun tail ->
-            returnP (head::tail) ))
+        parser {
+            let! head = p
+            let! tail = many p
+            return head::tail
+        }
         |> allowBacktrack        
 
-    //"a" |> fromStr |> run parseDigit|>printResult
-
-    ////Pg 1
-
-    let parseThreeDigits = 
-        parseDigit .>>. parseDigit .>>. parseDigit 
-    
-
-    //"     \n12a3" |> fromStr |> run (many (pchar ' ') .>>. pchar '\n' .>>. parseThreeDigits) |>printResult
-    //run parseThreeDigits "123A"
-
-    let mapP (fMap:'a->'b) (Parser(_,p)) =
-        Parser("unknown",fun input ->
-            match p input with
-            | Failure (lbl,err) -> Failure (lbl,err)
-            | Success (v,r) -> Success(fMap v,r)
-        )
+    let mapP (fMap:'a->'b) p =
+        parser {
+            let! r = p
+            return fMap r
+        }
+        <?> getLabel p
 
     let (<!>) = mapP
 
     let (|>>) x f = mapP f x
 
-    let parseThreeDigitsAsStr  = 
-        (parseDigit .>>. parseDigit .>>. parseDigit)
-        |>> fun ((c1,c2),c3) -> String [|c1;c2;c3|]
-    
-   
-    let parseThreeDigitsAsInt  = mapP int parseThreeDigitsAsStr
-
     let applyP fP xP =             //this will take a parser of a function and apply that function to xP
-        fP >>= (fun f ->               // (fP:Parser<('a -> 'b)>) -> (xP:Parser<'a>) -> Parser<'b>
-        xP >>= (fun x ->
-            returnP (f x) ))
+        parser {
+            let! f = fP
+            let! x = xP
+            return f x
+        }
 
     let (<*>) = applyP
 
@@ -289,12 +312,19 @@ module Parser =
     let startsWithP = 
         lift2 startsWith       
     
-    let rec sequence parserList =           //take a list of parsers and get a parser of a list 
-        let cons head tail = head::tail     //Parser<'a> list -> Parser<'a list>
-        let consP = lift2 cons 
-        match parserList with 
-        | [] -> returnP []
-        | head::tail -> consP head (sequence tail)
+
+    //take a list of parsers and get a parser of a list
+    let sequence parserList =
+        let lbl = sprintf "sequence of %A" (parserList |> List.map getLabel)
+        let rec loop parsers input cont =
+            match parsers with
+            | [] -> cont ([],input)
+            | (Parser (plbl,phead)) :: rest ->
+                match phead input with
+                | Failure (_,err) -> Failure (lbl,err)
+                | Success (result,input') ->
+                    loop rest input' (fun (results,input'') -> (result :: results,input'') |> cont)
+        Parser(lbl,fun input -> loop parserList input Success)
 
     let charListToString charList =         //helper fn
         String(List.toArray charList)
@@ -315,16 +345,16 @@ module Parser =
         <?> sprintf "%s?" p.Label
 
     let pint = 
-        let resultToInt (sign,charList) = 
-            let i = String(List.toArray charList) |> int 
-            match sign with 
-            | Some _ -> -i //if we have a character, then the result should be a negative number
-            | None -> i 
-        let digit = anyOf ['0'..'9']    //technically we have this defined way above already
-        let digits = many1 digit        //defining a parser for 1 or more digits in a list
-
-        opt (pchar '-') .>>. digits 
-        |>> resultToInt
+        parser {
+            let! sign = opt (pchar '-' <|> pchar '+')
+            let digit = anyOf ['0'..'9']
+            let! digits = many1 digit
+            let value = digits |> List.toArray |> String |> int
+            return
+                match sign with
+                | Some '-' -> -value
+                | _ -> value
+        }
         <?> "integer"
 
 
@@ -354,20 +384,6 @@ module Parser =
     let sepBy p sep =
         sepBy1 p sep <|> returnP []
 
-    let pfail lbl msg =
-        Parser(lbl,fun input ->
-            Failure(lbl,{msg = msg; pos = input.Position; sourceLine = input.SourceLine; consumedInput = true; cut = false})
-        )
-
-    let delayP f =
-        Parser("delay",fun input ->
-            let p = f()
-            run p input
-        )
-
-    //// pg 3
-
-    //////////Int Calculator/////////////
     let recursiveDefP lbl =
         let mutableDef = ref (pfail "default Recursive" (sprintf "recursiveDefP %s hasn't nor be assigned to yet" lbl))
         let p = Parser(lbl,fun input -> run !mutableDef input)
@@ -407,6 +423,102 @@ module Calculator =
             | Some right -> Add(left,right) |> returnP))
     pExpr' := pTerm
     
+module CodeGen =
+    open Calculator
+    type Operations =
+        | LoadConstant of int
+        | AddInstr
+        | MultiplyInstr
+
+    let optimize (expr:Expr) =
+        let rec loop (expr:Expr) cont =
+            match expr with
+            | Literal c -> cont (Literal c)
+            | Add (left, right) ->
+                loop left (fun newLeft ->
+                    loop right (fun newRight ->
+                        match newLeft, newRight with
+                        | Literal 0, right -> cont right
+                        | left, Literal 0  -> cont left
+                        | Literal 0, Literal 0 -> cont (Literal 0)
+                        | l,r -> cont (Add (l,r))
+                    )
+                )
+            | Multiply (left, right) ->
+                loop left (fun newLeft ->
+                    loop right (fun newRight ->
+                        match newLeft, newRight with
+                        | Literal 1, right -> cont right
+                        | left, Literal 1  -> cont left
+                        | Literal 1, Literal 1 -> cont (Literal 1)
+                        | Literal 0, _
+                        | _, Literal 0 -> cont (Literal 0)
+                        | l,r -> cont (Multiply (l,r))
+                    )
+                )
+        loop expr id            
+
+
+    let generateIL (expr:Expr) =
+        let rec loop (expr:Expr) cont =
+            match expr with
+            | Literal i ->
+                let instr = LoadConstant i
+                Seq.singleton instr
+                |> cont
+            | Add (left,right) ->
+                loop left (fun leftinstrs ->
+                    loop right (fun rightinstrs ->
+                        seq {
+                            yield! leftinstrs
+                            yield! rightinstrs
+                            yield AddInstr
+                        } |> cont
+                    )
+                )
+            | Multiply (left,right) ->
+                loop left (fun leftinstrs ->
+                    loop right (fun rightinstrs ->
+                        seq {
+                            yield! leftinstrs
+                            yield! rightinstrs
+                            yield MultiplyInstr
+                        } |> cont
+                    )
+                )
+        loop expr (fun instrs ->
+            seq {
+                yield ".assembly extern mscorlib {}"
+                yield ".assembly Hello {}"
+                yield ".module Hello.exe"
+                 
+                yield ".method static void entrypoint()"
+                yield "cil managed"
+                yield "{"
+                yield "    .entrypoint"
+                yield "    .locals init (int32 v)"
+
+                // our code goes here
+                yield!
+                    instrs
+                    |> Seq.map (function
+                        | LoadConstant c -> sprintf "    ldc.i4 %d" c
+                        | AddInstr -> sprintf "    add"
+                        | MultiplyInstr -> sprintf "    mul"
+                    )
+
+                yield "    stloc.s v"
+                yield "    ldstr \"{0}\""
+                yield "    ldloc.s v"
+                yield "    box valuetype [mscorlib]System.Int32"
+                yield "    call void [mscorlib]System.Console::WriteLine(string,object)"
+                yield "    ret"
+                yield "}"
+            }
+            |> String.concat "\n"
+        )
+        
+     
     
 
 open Parser
@@ -414,14 +526,16 @@ open Calculator
 [<EntryPoint>]
 let main argv =
     printfn "Hello World from F#!"
-    "(23+1)+((3))*1" |> fromStr |> run pExpr |> printResult
-    let pId = Parser.satisfy (System.Char.IsLetter) "letters" |> many1 <?> "id"
-    let forStmt = (pString "for" >>. (many1 parseWhitespace) |> allowBacktrack) >>. pId <?> "for"
-    let formatStmt = (pString "format" >>. (many1 parseWhitespace) |> allowBacktrack) >>. pId <?> "format"
-    let ifStmt = pString "if" >>. (many1 parseWhitespace) >>. pId <?> "if"
+    let ast = "(23+1)+((3))*1" |> fromStr |> run pExpr
 
-    let stmt =  forStmt <|> formatStmt <|> ifStmt
+    ast |> printResult
 
-    "format 123" |> fromStr |> run stmt |> printResult
+    match ast with
+    | Success (expr,_) ->
+        CodeGen.optimize expr
+        |> CodeGen.generateIL
+        |> printfn "%s"
+    | Failure _ ->
+        printfn "No code generated!" 
 
     0 // return an integer exit code

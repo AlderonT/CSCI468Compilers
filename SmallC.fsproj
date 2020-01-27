@@ -6,7 +6,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="test.il" />
+    <None Include="hello.il" />
     <Compile Include="Program.fs" />
   </ItemGroup>
+
+  <ItemGroup />
 
 </Project>
