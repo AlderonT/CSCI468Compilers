@@ -398,7 +398,6 @@ module Calculator =
         | Multiply of left:Expr*right:Expr
         | Add of left:Expr*right:Expr
 
-
     let pExpr',pExpr = recursiveDefP "expr"
     let pLiteral = pint |>> Literal
     let pParens = pchar '(' >>. pExpr .>> pchar ')'
@@ -438,9 +437,9 @@ module CodeGen =
                 loop left (fun newLeft ->
                     loop right (fun newRight ->
                         match newLeft, newRight with
+                        | Literal 0, Literal 0 -> cont (Literal 0)
                         | Literal 0, right -> cont right
                         | left, Literal 0  -> cont left
-                        | Literal 0, Literal 0 -> cont (Literal 0)
                         | l,r -> cont (Add (l,r))
                     )
                 )
@@ -448,9 +447,9 @@ module CodeGen =
                 loop left (fun newLeft ->
                     loop right (fun newRight ->
                         match newLeft, newRight with
+                        | Literal 1, Literal 1 -> cont (Literal 1)
                         | Literal 1, right -> cont right
                         | left, Literal 1  -> cont left
-                        | Literal 1, Literal 1 -> cont (Literal 1)
                         | Literal 0, _
                         | _, Literal 0 -> cont (Literal 0)
                         | l,r -> cont (Multiply (l,r))
