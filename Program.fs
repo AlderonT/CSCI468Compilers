@@ -1,5 +1,5 @@
 ﻿open System
-
+#nowarn "40"
 module Parser =
     
     //
@@ -422,6 +422,92 @@ module Calculator =
             | Some right -> Add(left,right) |> returnP))
     pExpr' := pTerm
     
+module Grammar = 
+    open Parser
+
+    type Token = 
+        | IntegerLiteral of string 
+        | FloatLiteral of string 
+        | StringLiteral of string
+        | Comment  
+        | Whitespace 
+        | Keyword of string
+        | Operator of string 
+        | Identifier of string
+
+
+    let keywords = ["PROGRAM";"BEGIN";"FUNCTION";"READ";"WRITE";"ENDIF";"IF";"ELSE";"ENDWHILE";"WHILE";"CONTINUE";"END";"BREAK";"RETURN";"INT";"VOID";"STRING";"FLOAT"]
+    let operators = [":=";"+";"-";"*";"/";"<=";">=";"=";"!=";"<";">";"(";")";";";","]
+    
+    let keyword = 
+        keywords 
+        |> Seq.map pString
+        |> choice 
+        |>> Keyword
+
+    let operator = 
+        operators 
+        |> Seq.map pString
+        |> choice 
+        |>> Operator
+
+    let numberLiteral = 
+        let digits = many1 parseDigit |>> (List.toArray >> String)
+        parser {
+            match! opt (pchar '.' >>. digits) with 
+            | Some fraction -> 
+                return fraction |> sprintf ".%s"|> FloatLiteral
+            | None -> 
+                let! prefix = digits
+                match! opt (pchar '.' >>. digits) with 
+                | Some fraction -> 
+                    return fraction |> sprintf "%s.%s" prefix |>FloatLiteral
+                | None -> return prefix |> IntegerLiteral
+                
+        }
+    let stringLiteral = 
+        let nonDoubleQuote = satisfy (fun c -> c <> '\"') "notDoubleQuote"
+        let insideString = many nonDoubleQuote |>> (List.toArray >> String)
+        parser {
+            do! pchar '\"' |> ignoreP
+            let! str = insideString
+            do! pchar '\"' |> ignoreP
+            return str |> StringLiteral
+        }
+    let comment = 
+        let nonNewLine = satisfy (fun c -> c <> '\n') "notNewLine"
+        let insideComment = many nonNewLine|>> (List.toArray >> String)
+        parser {            
+            do! pString "--"    |>ignoreP
+            do! insideComment   |>ignoreP
+            do! pchar '\n'      |>ignoreP
+            return Comment
+        }
+    let identifier = 
+        let firstChar  = satisfy (System.Char.ToLower>>(fun c -> 'a'<=c && c<='z')) "firstChar"
+        let restChar   = satisfy (System.Char.ToLower>>(fun c -> ('a'<=c && c<='z') || System.Char.IsDigit c)) "restChar"
+        parser {
+            let! first = firstChar
+            let! rest = many restChar
+            return first::rest |> List.toArray |> String |> Identifier 
+        }
+    let whitespace = 
+        satisfy System.Char.IsWhiteSpace "whitespace" |> many1 |>> (fun _ -> Whitespace)
+
+    let token =
+        [
+            whitespace
+            comment
+            keyword
+            operator
+            stringLiteral
+            numberLiteral
+            identifier
+        ] |> choice
+
+    let tokens = 
+        many1 token
+
 module CodeGen =
     open Calculator
     type Operations =
@@ -522,19 +608,39 @@ module CodeGen =
 
 open Parser
 open Calculator
+open Grammar
 [<EntryPoint>]
 let main argv =
-    printfn "Hello World from F#!"
-    let ast = "(23+1)+((3))*1" |> fromStr |> run pExpr
+    //printfn "Hello World from F#!"
+    //let ast = "(23+1)+((3))*1" |> fromStr |> run pExpr
 
-    ast |> printResult
+    //ast |> printResult
 
-    match ast with
-    | Success (expr,_) ->
-        CodeGen.optimize expr
-        |> CodeGen.generateIL
-        |> printfn "%s"
-    | Failure _ ->
-        printfn "No code generated!" 
+    //match ast with
+    //| Success (expr,_) ->
+    //    CodeGen.optimize expr
+    //    |> CodeGen.generateIL
+    //    |> printfn "%s"
+    //| Failure _ ->
+    //    printfn "No code generated!" 
+
+    let printToken token = 
+        match token with 
+        | Whitespace 
+        | Comment -> ()
+        | Keyword k -> printfn "Token Type: KEYWORD\nValue: %s" k
+        | Operator o -> printfn "Token Type: OPERATOR\nValue: %s" o 
+        | Identifier i -> printfn "Token Type: IDENTIFIER\nValue: %s" i
+        | StringLiteral s -> printfn "Token Type: STRINGLITERAL\nValue: \"%s\"" s
+        | IntegerLiteral i -> printfn "Token Type: INTLITERAL\nValue: %s" i
+        | FloatLiteral f -> printfn "Token Type: FLOATLITERAL\nValue: %s" f
+
+    let file = System.IO.File.ReadAllText argv.[0]
+    let tokenList = file |> fromStr |> run tokens
+    match tokenList with
+    | Success (result,_) ->
+        result |> Seq.iter printToken
+        //printfn "lastToken: %A" result.[result.Length-2]
+    | Failure _ -> printfn "%A" tokenList
 
     0 // return an integer exit code

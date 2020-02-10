@@ -1,3 +1,5 @@
 bin/
 .vs/
 obj/
+/.ionide/symbolCache.db
+/Properties/launchSettings.json
