@@ -609,38 +609,37 @@ module CodeGen =
 open Parser
 open Calculator
 open Grammar
+
+let printUsage () = 
+    printfn "Usage: micro [-h|--help] <file_name>"
+    printfn "     -h|--help:   displays usage"
+    printfn "     file_name:   .micro source file to be processed"
+    
+
 [<EntryPoint>]
 let main argv =
-    //printfn "Hello World from F#!"
-    //let ast = "(23+1)+((3))*1" |> fromStr |> run pExpr
+    if argv.Length<1 then 
+        printUsage()
+    elif argv.[0] = "-h" || argv.[0] = "--help" then 
+        printUsage()
+    else 
+        let printToken token = 
+            match token with 
+            | Whitespace 
+            | Comment -> ()
+            | Keyword k -> printfn "Token Type: KEYWORD\nValue: %s" k
+            | Operator o -> printfn "Token Type: OPERATOR\nValue: %s" o 
+            | Identifier i -> printfn "Token Type: IDENTIFIER\nValue: %s" i
+            | StringLiteral s -> printfn "Token Type: STRINGLITERAL\nValue: \"%s\"" s
+            | IntegerLiteral i -> printfn "Token Type: INTLITERAL\nValue: %s" i
+            | FloatLiteral f -> printfn "Token Type: FLOATLITERAL\nValue: %s" f
 
-    //ast |> printResult
-
-    //match ast with
-    //| Success (expr,_) ->
-    //    CodeGen.optimize expr
-    //    |> CodeGen.generateIL
-    //    |> printfn "%s"
-    //| Failure _ ->
-    //    printfn "No code generated!" 
-
-    let printToken token = 
-        match token with 
-        | Whitespace 
-        | Comment -> ()
-        | Keyword k -> printfn "Token Type: KEYWORD\nValue: %s" k
-        | Operator o -> printfn "Token Type: OPERATOR\nValue: %s" o 
-        | Identifier i -> printfn "Token Type: IDENTIFIER\nValue: %s" i
-        | StringLiteral s -> printfn "Token Type: STRINGLITERAL\nValue: \"%s\"" s
-        | IntegerLiteral i -> printfn "Token Type: INTLITERAL\nValue: %s" i
-        | FloatLiteral f -> printfn "Token Type: FLOATLITERAL\nValue: %s" f
-
-    let file = System.IO.File.ReadAllText argv.[0]
-    let tokenList = file |> fromStr |> run tokens
-    match tokenList with
-    | Success (result,_) ->
-        result |> Seq.iter printToken
-        //printfn "lastToken: %A" result.[result.Length-2]
-    | Failure _ -> printfn "%A" tokenList
+        let file = System.IO.File.ReadAllText argv.[0]
+        let tokenList = file |> fromStr |> run tokens
+        match tokenList with
+        | Success (result,_) ->
+            result |> Seq.iter printToken
+            //printfn "lastToken: %A" result.[result.Length-2]
+        | Failure _ -> printfn "%A" tokenList
 
     0 // return an integer exit code
