@@ -508,6 +508,151 @@ module Grammar =
     let tokens = 
         many1 token
 
+
+    ////////////////////////////////////////////////////////////
+    ////    GRAMMAR PARSING
+    ////    
+    ////    ...pls help...
+    ////////////////////////////////////////////////////////////
+
+    let empty = 
+        pString "VOID" //*We need to seperate out the keywords so we can parse as 'tokens'
+    
+    let id_tail =   //****NEEDS TO BE RECURSIVE DEFINITION
+        parser {
+            do! pchar ',' |> ignoreP
+            do! whitespace |> ignoreP
+            let! i = identifier 
+            do! whitespace |> ignoreP
+            let! it = id_tail
+        } <|> empty
+
+    let id_list = 
+        parser {
+            let! i = identifier
+            let! it = id_tail 
+            return i,it
+        }
+
+    let any_type = 
+        numberLiteral <|> pString "VOID" //*We need to seperate out the keywords so we can parse as 'tokens'
+
+    let var_decl = 
+        parser {
+            let! t = var_type
+            let! l = id_list
+            return t,l
+        }
+
+    let string_decl = 
+        parser {
+            do! pString "STRING" |>ignoreP //*We need to seperate out the keywords so we can parse as 'tokens'
+            do! whitespace |> ignoreP
+            let! i = identifier
+            do! whitespace |> ignoreP
+            do! pString ":=" |>ignoreP
+            do! whitespace |> ignoreP
+            let! s = stringLiteral 
+            return i,s
+        }
+
+    let decl =  //****NEEDS TO BE RECURSIVE DEFINITION
+        parser {
+            let! p = string_decl <|> var_decl
+            do! whitespace |> ignoreP
+            let! d = decl 
+            return p,d
+        } <|> empty
+
+    
+    let var_type = 
+        numberLiteral
+
+    let func_body = 
+        parser {
+            let! d = decl 
+            do! whitespace |> ignoreP
+            let! sl = stmt_list
+            return d,sl
+        }
+
+    let func_decl = 
+        parser {
+            do! pString "FUNCTION" |>ignoreP //*We need to seperate out the keywords so we can parse as 'tokens'        
+            do! whitespace |> ignoreP
+            let! t = any_type
+            do! whitespace |> ignoreP
+            let! i = identifier 
+            do! whitespace |> ignoreP
+            do! pchar '(' |> ignoreP
+            let pdl = param_decl_list
+            do! pchar ')' |> ignoreP
+            do! whitespace |> ignoreP
+            do! pString "BEGIN" |>ignoreP //*We need to seperate out the keywords so we can parse as 'tokens'        
+            do! whitespace |> ignoreP
+            let fb = func_body
+            do! pString "END" |>ignoreP //*We need to seperate out the keywords so we can parse as 'tokens'        
+            do! whitespace |> ignoreP
+            return t,i,pdl,fb
+        }
+
+    let func_declarations = //****NEEDS TO BE RECURSIVE DEFINITION
+        parser {
+            let! fd = func_decl
+            do! whitespace |> ignoreP
+            let! fds = func_declarations
+            return fd,fds
+        } <|> empty
+
+    let param_decl = 
+        parser {
+            let! t = var_type 
+            do! whitespace |> ignoreP
+            let! i = identifier
+            return t,i
+        }
+
+    let param_decl_tail = //****NEEDS TO BE RECURSIVE DEFINITION
+        parser {
+            do! pchar ',' |> ignoreP
+            do! whitespace |> ignoreP
+            let! pd = param_decl 
+            do! whitespace |> ignoreP
+            let! pdt = param_decl_tail
+            return pd,pdt
+        } <|> empty
+
+    let peram_decl_list = 
+        parser {
+            let! pd = param_decl 
+            do! whitespace |> ignoreP
+            let! pdt = param_decl_tail
+            return pd,pdt
+        } <|> empty
+ 
+
+    let pgm_body = 
+        parser {
+            let! d = decl
+            do! whitespace |> ignoreP
+            let! f = func_declarations
+            return d,f
+        }
+
+    let program = 
+        parser {
+            do! pString "PROGRAM" |> ignoreP //*We need to seperate out the keywords so we can parse as 'tokens'
+            do! whitespace |> ignoreP
+            let! i = identifier
+            do! whitespace |> ignoreP
+            do! pString "BEGIN" |> ignoreP //*We need to seperate out the keywords so we can parse as 'tokens'
+            do! whitespace |> ignoreP
+            let! pb = pgm_body 
+            do! whitespace |> ignoreP
+            do! pString "END" |>ignoreP //*We need to seperate out the keywords so we can parse as 'tokens'
+            return i,pb
+        }
+
 module CodeGen =
     open Calculator
     type Operations =
@@ -603,8 +748,6 @@ module CodeGen =
             |> String.concat "\n"
         )
         
-     
-    
 
 open Parser
 open Calculator
