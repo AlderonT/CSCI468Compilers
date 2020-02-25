@@ -568,6 +568,28 @@ module Grammar =
     let var_type = 
         numberLiteral
 
+    //let read_stmt = //USE FHE FORMAT FROM func_decl and from the proceeding 2 stmts
+
+    let read_stmt = 
+        identifier .>> whitespace .>> pString ":=" .>> whitespace .>>. expr   
+
+    let assign_stmt = 
+        assign_expr .>> whitespace .>> pchar ';'
+    
+    let base_stmt = 
+        assign_stmt <|> read_stmt <|> write_stmt <|> return_stmt
+
+    let stmt = 
+        base_stmt <|> if_stmt <|> while_stmt
+    
+    let stmt_list =
+        parser {
+            let! s = stmt 
+            do! whitespace |> ignoreP
+            let! st = stmt_list 
+            return s,st
+        } <|> empty
+
     let func_body = 
         parser {
             let! d = decl 
