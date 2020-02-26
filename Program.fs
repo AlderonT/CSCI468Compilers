@@ -389,11 +389,10 @@ module Parser =
         let p = Parser(lbl,fun input -> run !mutableDef input)
         mutableDef,p
 
-
 module Calculator =
     open Parser
 
-    type Expr =
+    type Expr = //THIS IS OUR ABSTRACT SYNTAX TREE
         | Literal of int
         | Multiply of left:Expr*right:Expr
         | Add of left:Expr*right:Expr
@@ -424,35 +423,105 @@ module Calculator =
     
 module Grammar = 
     open Parser
+    //type Token = 
+    //    | IntegerLiteral of string 
+    //    | FloatLiteral of string 
+    //    | StringLiteral of string
+    //    | Comment  
+    //    | Whitespace 
+    //    | Keyword of string
+    //    | Operator of string 
+    //    | Identifier of string
+    //let keywords = ["PROGRAM";"BEGIN";"FUNCTION";"READ";"WRITE";"ENDIF";"IF";"ELSE";"ENDWHILE";"WHILE";"CONTINUE";"END";"BREAK";"RETURN";"INT";"VOID";"STRING";"FLOAT"]
+    //let operators = [":=";"+";"-";"*";"/";"<=";">=";"=";"!=";"<";">";"(";")";";";","] 
+    //let comOperators = ["<=";">=";"=";"!=";"<";">"] 
+    ////Seperate the Keywords and operators into a set of parsers for each keyword/operator
+    //let keyword = 
+    //    keywords 
+    //    |> Seq.map pString
+    //    |> choice 
+    //    |>> Keyword
+    //let operator = 
+    //    operators 
+    //    |> Seq.map pString
+    //    |> choice 
+    //    |>> Operator
 
-    type Token = 
-        | IntegerLiteral of string 
-        | FloatLiteral of string 
+    type Literal =
         | StringLiteral of string
-        | Comment  
-        | Whitespace 
-        | Keyword of string
-        | Operator of string 
-        | Identifier of string
+        | IntegerLiteral of string
+        | FloatLiteral of string
+
+    type VarType = | Float | Int
+    type ReturnType = | Void | Float | Int
+    type Decl =
+        | String of id:string*literal:string
+        | Float of ids: string list
+        | Int of ids: string list
+
+    type CondOperators =
+        | LessThen
+        | GreaterThen
+        | Equal
+        | NotEqual
+        | LessThenOrEqual
+        | GreaterThenOrEqual
+        with
+            member this.ToString() =
+                match this with
+                | LessThen -> "<"
+                | GreaterThen -> ">"
+                | Equal -> "="
+                | LessThenOrEqual -> "<="
+                | GreaterThenOrEqual -> ">="
+                | NotEqual -> "!="
 
 
-    let keywords = ["PROGRAM";"BEGIN";"FUNCTION";"READ";"WRITE";"ENDIF";"IF";"ELSE";"ENDWHILE";"WHILE";"CONTINUE";"END";"BREAK";"RETURN";"INT";"VOID";"STRING";"FLOAT"]
-    let operators = [":=";"+";"-";"*";"/";"<=";">=";"=";"!=";"<";">";"(";")";";";","]
+    type Expr =
+        | IntegerLiteral of string
+        | FloatLiteral of string
+        | Identifer of string
+        | ConditionalExpr of op:CondOperators*left:Expr*right:Expr
     
-    let keyword = 
-        keywords 
-        |> Seq.map pString
-        |> choice 
-        |>> Keyword
+    type Block =
+        {
+            decls : Decl list
+            stmts : Stmt list
+        }
+    and Stmt =
+        | Read of ids: string list
+        | Write of ids: string list 
+        | Assign of id: string * expr:Expr
+        | Return of expr:Expr 
+        | If of cond:Expr * trueBody:Block * elseBody:Block option
+        | While of cond:Expr * body:Block
 
-    let operator = 
-        operators 
-        |> Seq.map pString
-        |> choice 
-        |>> Operator
+    type ParamDecl =
+        | Float of id:string
+        | Int of id:string
+
+    type FuncDecl =
+        {
+            returnType: ReturnType
+            name: string
+            parameters: ParamDecl list
+            decls: Decl list
+            stmts: Stmt list
+        }
+
+    type Program =
+        {
+            programName: string
+            decls: Decl list 
+            functions: FuncDecl list 
+        }    
+
+    type AST = 
+        | Decl of Decl list
+        
 
     let numberLiteral = 
-        let digits = many1 parseDigit |>> (List.toArray >> String)
+        let digits = many1 parseDigit |>> (List.toArray >> System.String)
         parser {
             match! opt (pchar '.' >>. digits) with 
             | Some fraction -> 
@@ -467,213 +536,332 @@ module Grammar =
         }
     let stringLiteral = 
         let nonDoubleQuote = satisfy (fun c -> c <> '\"') "notDoubleQuote"
-        let insideString = many nonDoubleQuote |>> (List.toArray >> String)
+        let insideString = many nonDoubleQuote |>> (List.toArray >> System.String)
         parser {
             do! pchar '\"' |> ignoreP
             let! str = insideString
             do! pchar '\"' |> ignoreP
-            return str |> StringLiteral
+            return (str : string)
         }
     let comment = 
         let nonNewLine = satisfy (fun c -> c <> '\n') "notNewLine"
-        let insideComment = many nonNewLine|>> (List.toArray >> String)
+        let insideComment = many nonNewLine|>> (List.toArray >> System.String)
         parser {            
             do! pString "--"    |>ignoreP
             do! insideComment   |>ignoreP
             do! pchar '\n'      |>ignoreP
-            return Comment
+            return ()
         }
-    let identifier = 
+    let identifier' = 
         let firstChar  = satisfy (System.Char.ToLower>>(fun c -> 'a'<=c && c<='z')) "firstChar"
         let restChar   = satisfy (System.Char.ToLower>>(fun c -> ('a'<=c && c<='z') || System.Char.IsDigit c)) "restChar"
         parser {
             let! first = firstChar
             let! rest = many restChar
-            return first::rest |> List.toArray |> String |> Identifier 
+            return first::rest |> List.toArray |> System.String
         }
-    let whitespace = 
-        satisfy System.Char.IsWhiteSpace "whitespace" |> many1 |>> (fun _ -> Whitespace)
+    let whitespaceChars = 
+        satisfy System.Char.IsWhiteSpace "whitespace" |> many1 |> ignoreP
+    let whitespace =
+        many1 (whitespaceChars <|> comment) |> ignoreP
 
-    let token =
-        [
-            whitespace
-            comment
-            keyword
-            operator
-            stringLiteral
-            numberLiteral
-            identifier
-        ] |> choice
-
-    let tokens = 
-        many1 token
-
-
-    ////////////////////////////////////////////////////////////
-    ////    GRAMMAR PARSING
-    ////    
-    ////    ...pls help...
-    ////////////////////////////////////////////////////////////
-
-    let empty = 
-        pString "VOID" //*We need to seperate out the keywords so we can parse as 'tokens'
+    let FUNCTION = pString "FUNCTION" .>> (opt whitespace) |> ignoreP
+    let PROGRAM = pString "PROGRAM" .>> (opt whitespace) |> ignoreP
+    let BEGIN = pString "BEGIN" .>> (opt whitespace) |> ignoreP
+    let END = pString "END" .>> (opt whitespace) |> ignoreP
+    let STRING = pString "STRING" .>> (opt whitespace) |> ignoreP
+    let FLOAT = pString "FLOAT" .>> (opt whitespace) |>> (fun _ -> VarType.Float)
+    let INT = pString "INT" .>> (opt whitespace) |>> (fun _ -> VarType.Int)
+    let VOID = pString "VOID" .>> (opt whitespace) |> ignoreP
+    let ASSIGNMENTOP = pString ":=" .>> (opt whitespace) |> ignoreP
+    let SEMICOLON = pchar ';' .>> (opt whitespace) |> ignoreP
+    let COMMA = pchar ',' .>> (opt whitespace) |> ignoreP
+    let LPAREN = pchar '(' .>> (opt whitespace) |> ignoreP
+    let RPAREN = pchar ')' .>> (opt whitespace) |> ignoreP
+    let READ = pString "READ" .>> (opt whitespace) |> ignoreP
+    let WRITE = pString "WRITE" .>> (opt whitespace) |> ignoreP
+    let RETURN = pString "RETURN" .>> (opt whitespace) |> ignoreP
+    let IF = pString "IF" .>> (opt whitespace) |> ignoreP
+    let ENDIF = pString "ENDIF" .>> (opt whitespace) |> ignoreP
+    let ELSE = pString "ELSE" .>> (opt whitespace) |> ignoreP
+    let WHILE = pString "WHILE" .>> (opt whitespace) |> ignoreP
+    let ENDWHILE = pString "ENDWHILE" .>> (opt whitespace) |> ignoreP
+    let LESSTHENOP = pchar '<' .>> (opt whitespace) |>> function _ -> LessThen
+    let GREATERTHENOP = pchar '>' .>> (opt whitespace) |>> function _ -> GreaterThen
+    let LESSTHENOREQUALOP = pString "<=" .>> (opt whitespace) |>> function _ -> LessThenOrEqual
+    let GREATERTHENOREQUALOP = pString ">=" .>> (opt whitespace) |>> function _ -> GreaterThenOrEqual
+    let EQUALOP = pchar '=' .>> (opt whitespace) |>> function _ -> Equal    
+    let NOTEQUALOP = pString "!=" .>> (opt whitespace) |>> function _ -> NotEqual
+    let identifier = identifier' .>> (opt whitespace)
     
-    let id_tail =   //****NEEDS TO BE RECURSIVE DEFINITION
-        parser {
-            do! pchar ',' |> ignoreP
-            do! whitespace |> ignoreP
-            let! i = identifier 
-            do! whitespace |> ignoreP
-            let! it = id_tail
-        } <|> empty
 
-    let id_list = 
+    let stringDecl =
         parser {
-            let! i = identifier
-            let! it = id_tail 
-            return i,it
+            do! STRING
+            let! id = identifier
+            do! ASSIGNMENTOP
+            let! literal = stringLiteral
+            do! SEMICOLON
+            return Decl.String(id,literal)
+        }
+    let idListTail = many (COMMA >>. identifier)
+    let idList =
+        identifier .>>. idListTail
+        |>> (fun (id,rest) -> id::rest)
+    let varDecl =
+        parser {
+            let! varType = FLOAT <|> INT
+            let! ids = idList
+            do! SEMICOLON
+            return
+                match varType with
+                | VarType.Float -> Decl.Float ids
+                | VarType.Int -> Decl.Int ids
         }
 
-    let any_type = 
-        numberLiteral <|> pString "VOID" //*We need to seperate out the keywords so we can parse as 'tokens'
+    let decl =
+        stringDecl <|> varDecl <?> "decl"
+        
+    let decls = many decl <?> "decls"
 
-    let var_decl = 
+    let returnType =
+        (FLOAT |>> (function _ -> ReturnType.Float))
+        <|> (INT |>> (function _ -> ReturnType.Int))
+        <|> (VOID |>> (function _ -> ReturnType.Void))
+
+    let param_decl =
         parser {
-            let! t = var_type
-            let! l = id_list
-            return t,l
+            let! varType = FLOAT <|> INT
+            let! id = identifier
+            
+            return
+                match varType with
+                | VarType.Float -> ParamDecl.Float id
+                | VarType.Int -> ParamDecl.Int id
         }
 
-    let string_decl = 
-        parser {
-            do! pString "STRING" |>ignoreP //*We need to seperate out the keywords so we can parse as 'tokens'
-            do! whitespace |> ignoreP
-            let! i = identifier
-            do! whitespace |> ignoreP
-            do! pString ":=" |>ignoreP
-            do! whitespace |> ignoreP
-            let! s = stringLiteral 
-            return i,s
-        }
+    let expr', expr = recursiveDefP "expr"
 
-    let decl =  //****NEEDS TO BE RECURSIVE DEFINITION
-        parser {
-            let! p = string_decl <|> var_decl
-            do! whitespace |> ignoreP
-            let! d = decl 
-            return p,d
-        } <|> empty
+    expr' := numberLiteral <|> (identifier |>> Identifer)
 
-    
-    let var_type = 
-        numberLiteral
-
-    //let read_stmt = //USE FHE FORMAT FROM func_decl and from the proceeding 2 stmts
+    // stmt
+    let stmt',stmt = recursiveDefP "stmt"
 
     let read_stmt = 
-        identifier .>> whitespace .>> pString ":=" .>> whitespace .>>. expr   
+        parser {
+            do! READ
+            do! LPAREN
+            let! ids = idList
+            do! RPAREN
+            do! SEMICOLON
+            return Stmt.Read ids
+        }
 
     let assign_stmt = 
-        assign_expr .>> whitespace .>> pchar ';'
-    
-    let base_stmt = 
-        assign_stmt <|> read_stmt <|> write_stmt <|> return_stmt
-
-    let stmt = 
-        base_stmt <|> if_stmt <|> while_stmt
-    
-    let stmt_list =
         parser {
-            let! s = stmt 
-            do! whitespace |> ignoreP
-            let! st = stmt_list 
-            return s,st
-        } <|> empty
+            let! id = identifier
+            do! ASSIGNMENTOP
+            let! expr = expr
+            do! SEMICOLON
+            return Stmt.Assign (id,expr)
+        }
 
-    let func_body = 
+    let write_stmt = 
         parser {
-            let! d = decl 
-            do! whitespace |> ignoreP
+            do! WRITE
+            do! LPAREN
+            let! ids = idList
+            do! RPAREN
+            do! SEMICOLON
+            return Stmt.Write ids
+        }
+
+    let return_stmt = 
+        parser {
+            do! RETURN
+            let! expr = expr
+            do! SEMICOLON
+            return Stmt.Return expr
+        }
+
+    let base_stmt = read_stmt <|> write_stmt <|> return_stmt <|> assign_stmt
+
+    
+    let condop = 
+        LESSTHENOREQUALOP <|> GREATERTHENOREQUALOP <|> NOTEQUALOP <|> LESSTHENOP <|> GREATERTHENOP <|> EQUALOP
+        
+
+    let cond = 
+        parser {
+            let! left = expr
+            let! op = condop
+            let! right = expr 
+            return Expr.ConditionalExpr (op,left,right)
+        }
+
+    let stmt_list', stmt_list = recursiveDefP "stmt_list"
+
+    let block =
+        parser {
+            let! d = decls
             let! sl = stmt_list
-            return d,sl
+            return {decls = d; stmts = sl}
         }
 
-    let func_decl = 
+    let elseBlock =
         parser {
-            do! pString "FUNCTION" |>ignoreP //*We need to seperate out the keywords so we can parse as 'tokens'        
-            do! whitespace |> ignoreP
-            let! t = any_type
-            do! whitespace |> ignoreP
-            let! i = identifier 
-            do! whitespace |> ignoreP
-            do! pchar '(' |> ignoreP
-            let pdl = param_decl_list
-            do! pchar ')' |> ignoreP
-            do! whitespace |> ignoreP
-            do! pString "BEGIN" |>ignoreP //*We need to seperate out the keywords so we can parse as 'tokens'        
-            do! whitespace |> ignoreP
-            let fb = func_body
-            do! pString "END" |>ignoreP //*We need to seperate out the keywords so we can parse as 'tokens'        
-            do! whitespace |> ignoreP
-            return t,i,pdl,fb
+            do! ELSE
+            return! block
         }
 
-    let func_declarations = //****NEEDS TO BE RECURSIVE DEFINITION
+    let if_stmt = 
         parser {
-            let! fd = func_decl
-            do! whitespace |> ignoreP
-            let! fds = func_declarations
-            return fd,fds
-        } <|> empty
-
-    let param_decl = 
-        parser {
-            let! t = var_type 
-            do! whitespace |> ignoreP
-            let! i = identifier
-            return t,i
+            do! IF
+            do! LPAREN
+            let! cond = cond
+            do! RPAREN
+            let! block = block 
+            let! elseBlock = opt elseBlock
+            do! ENDIF
+            return Stmt.If (cond,block,elseBlock)
         }
 
-    let param_decl_tail = //****NEEDS TO BE RECURSIVE DEFINITION
-        parser {
-            do! pchar ',' |> ignoreP
-            do! whitespace |> ignoreP
-            let! pd = param_decl 
-            do! whitespace |> ignoreP
-            let! pdt = param_decl_tail
-            return pd,pdt
-        } <|> empty
 
-    let peram_decl_list = 
+    let while_stmt =
         parser {
-            let! pd = param_decl 
-            do! whitespace |> ignoreP
-            let! pdt = param_decl_tail
-            return pd,pdt
-        } <|> empty
- 
+            do! WHILE
+            do! LPAREN
+            let! cond = cond
+            do! RPAREN
+            let! block = block 
+            do! ENDWHILE
+            return Stmt.While (cond,block)
+        }
+
+    stmt' := if_stmt <|> while_stmt <|> base_stmt
+
+    stmt_list' := many stmt
+
+    let param_decl_list = sepBy param_decl COMMA
+
+    let funcParameters = between LPAREN param_decl_list RPAREN
+
+    let func_declaration =
+        parser {
+            do! FUNCTION
+            let! returnType = returnType
+            let! name = identifier
+            let! parameters = funcParameters
+            do! BEGIN
+            let! decls = decls
+            let! stmts = stmt_list
+            do! END
+            return {
+                returnType = returnType
+                name = name
+                parameters = parameters
+                decls = decls
+                stmts = stmts
+            }
+        }
+
+    let func_declarations = many func_declaration
 
     let pgm_body = 
         parser {
-            let! d = decl
-            do! whitespace |> ignoreP
-            let! f = func_declarations
-            return d,f
+            let! decls = decls
+            let! functions = func_declarations
+            return decls, functions
         }
 
     let program = 
         parser {
-            do! pString "PROGRAM" |> ignoreP //*We need to seperate out the keywords so we can parse as 'tokens'
-            do! whitespace |> ignoreP
-            let! i = identifier
-            do! whitespace |> ignoreP
-            do! pString "BEGIN" |> ignoreP //*We need to seperate out the keywords so we can parse as 'tokens'
-            do! whitespace |> ignoreP
-            let! pb = pgm_body 
-            do! whitespace |> ignoreP
-            do! pString "END" |>ignoreP //*We need to seperate out the keywords so we can parse as 'tokens'
-            return i,pb
-        }
+            do! PROGRAM
+            let! id = identifier
+            do! BEGIN
+            let! decls, functions = pgm_body 
+            do! END
+            return { programName = id; decls = decls; functions = functions }
+        }       
+        
+    let rec exprToString (expr:Expr) =
+        match expr with
+        | IntegerLiteral i -> i
+        | FloatLiteral f -> f
+        | Identifer i -> i
+        | ConditionalExpr (o,l,r) ->
+            let o = o.ToString()
+            sprintf "%s %s %s" (exprToString l) o (exprToString r)
+
+    let rec stmtToString (indent:string) (stmt:Stmt) =
+        let bodyToString indent (body:Block) =
+            seq {
+                let indent' = indent + "   "
+                yield!
+                    body.decls
+                    |> Seq.map (fun decl ->
+                        match decl with
+                        | Decl.String (i,v) -> sprintf "%sSTRING %s := %A;" indent' i v
+                        | Decl.Int ids -> sprintf "%sINT %s;" indent' (ids |> String.concat ", ")
+                        | Decl.Float ids -> sprintf "%sFLOAT %s;" indent' (ids |> String.concat ", ")
+                    )
+                yield!
+                    body.stmts
+                    |> Seq.map (stmtToString indent')
+            }
+            |> String.concat "\n"
+        match stmt with
+        | Stmt.Assign (id,expr) -> sprintf "%s%s := %s;" indent id (exprToString expr)
+        | Stmt.Read ids -> sprintf "%sREAD (%s);" indent (ids |> String.concat ",")
+        | Stmt.Write ids -> sprintf "%sWRITE (%s);" indent (ids |> String.concat ",")
+        | Stmt.Return expr -> sprintf "%sRETURN %s;" indent (exprToString expr)
+        | Stmt.If (cond,trueBody,None) ->
+            sprintf "%sIF (%s)\n%s\n%sENDIF" indent (exprToString cond) (bodyToString indent trueBody) indent
+        | Stmt.If (cond,trueBody,Some elseBody) ->
+            sprintf "%sIF (%s)\n%s\n%sELSE\n%s\n%sENDIF" indent (exprToString cond) (bodyToString indent trueBody) indent (bodyToString indent elseBody) indent
+        | Stmt.While (cond,body) ->
+            sprintf "%sWHILE (%s)\n%s\n%sENDWHILE" indent (exprToString cond) (bodyToString indent body) indent
+
+
+
+    let printProgram (p:Program) =
+        printfn "PROGRAM %s BEGIN" p.programName
+        p.decls
+        |> Seq.iter (fun decl ->
+            match decl with
+            | Decl.String (i,v) -> printfn "   STRING %s := %A;" i v
+            | Decl.Int ids -> printfn "   INT %s;" (ids |> String.concat ", ")
+            | Decl.Float ids -> printfn "   FLOAT %s;" (ids |> String.concat ", ")
+        )
+        p.functions
+        |> Seq.iter (fun func ->
+            let retType =
+                match func.returnType with
+                | ReturnType.Float -> "FLOAT"
+                | ReturnType.Int -> "INT"
+                | ReturnType.Void -> "VOID"
+            
+            printf "   FUNCTION %s %s" retType func.name
+            func.parameters
+            |> Seq.map (fun param ->
+                match param with
+                | ParamDecl.Int id -> sprintf "INT %s" id
+                | ParamDecl.Float id -> sprintf "FLOAT %s" id)
+            |> String.concat ","
+            |> printfn "(%s)"
+            printfn "   BEGIN"
+            func.decls
+            |> Seq.iter (fun decl ->
+                match decl with
+                | Decl.String (i,v) -> printfn "      STRING %s := %A;" i v
+                | Decl.Int ids -> printfn "      INT %s;" (ids |> String.concat ", ")
+                | Decl.Float ids -> printfn "      FLOAT %s;" (ids |> String.concat ", ")
+            )
+            func.stmts
+            |> Seq.iter (fun stmt -> stmtToString "      " stmt |> printfn "%s")
+            printfn "   END"
+        )
+        printfn "END"
 
 module CodeGen =
     open Calculator
@@ -770,7 +958,6 @@ module CodeGen =
             |> String.concat "\n"
         )
         
-
 open Parser
 open Calculator
 open Grammar
@@ -788,23 +975,28 @@ let main argv =
     elif argv.[0] = "-h" || argv.[0] = "--help" then 
         printUsage()
     else 
-        let printToken token = 
-            match token with 
-            | Whitespace 
-            | Comment -> ()
-            | Keyword k -> printfn "Token Type: KEYWORD\nValue: %s" k
-            | Operator o -> printfn "Token Type: OPERATOR\nValue: %s" o 
-            | Identifier i -> printfn "Token Type: IDENTIFIER\nValue: %s" i
-            | StringLiteral s -> printfn "Token Type: STRINGLITERAL\nValue: \"%s\"" s
-            | IntegerLiteral i -> printfn "Token Type: INTLITERAL\nValue: %s" i
-            | FloatLiteral f -> printfn "Token Type: FLOATLITERAL\nValue: %s" f
+        //let printToken token = 
+        //    match token with 
+        //    | Whitespace 
+        //    | Comment -> ()
+        //    | Keyword k -> printfn "Token Type: KEYWORD\nValue: %s" k
+        //    | Operator o -> printfn "Token Type: OPERATOR\nValue: %s" o 
+        //    | Identifier i -> printfn "Token Type: IDENTIFIER\nValue: %s" i
+        //    | StringLiteral s -> printfn "Token Type: STRINGLITERAL\nValue: \"%s\"" s
+        //    | IntegerLiteral i -> printfn "Token Type: INTLITERAL\nValue: %s" i
+        //    | FloatLiteral f -> printfn "Token Type: FLOATLITERAL\nValue: %s" f
 
         let file = System.IO.File.ReadAllText argv.[0]
-        let tokenList = file |> fromStr |> run tokens
-        match tokenList with
+        //let tokenList = file |> fromStr |> run tokens
+        //match tokenList with
+        //| Success (result,_) ->
+        //    result |> Seq.iter printToken
+        //    //printfn "lastToken: %A" result.[result.Length-2]
+        //| Failure _ -> printfn "%A" tokenList
+        let program = file |> fromStr |> run program
+        match program with
         | Success (result,_) ->
-            result |> Seq.iter printToken
+            printProgram result
             //printfn "lastToken: %A" result.[result.Length-2]
-        | Failure _ -> printfn "%A" tokenList
-
+        | Failure _ -> printfn "%A" program
     0 // return an integer exit code
