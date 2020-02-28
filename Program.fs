@@ -17,7 +17,14 @@ module Parser =
         sourceLine: string
         consumedInput : bool
     }
-
+    //type NewInputState<'T>= 
+    //    {
+    //        Elements: ('T*Position*string) list
+    //    }
+    //    with member this.Next() = 
+    //        match this.elements with 
+    //        | [] -> None
+    //        | (h,_,_)::rest ->  Some (h,{elements = })
     type InputState =
         {
             text: string
@@ -467,7 +474,7 @@ module Grammar =
         | LessThenOrEqual
         | GreaterThenOrEqual
         with
-            member this.ToString() =
+            override this.ToString() =
                 match this with
                 | LessThen -> "<"
                 | GreaterThen -> ">"
@@ -476,12 +483,32 @@ module Grammar =
                 | GreaterThenOrEqual -> ">="
                 | NotEqual -> "!="
 
+    type AddOperators =
+        | Add 
+        | Sub
+        with
+            override this.ToString() =
+                match this with
+                | Add -> "+"
+                | Sub -> "-"
+
+    type MulOperators =
+        | Mul 
+        | Div
+        with
+            override this.ToString() =
+                match this with
+                | Mul -> "*"
+                | Div -> "/"
 
     type Expr =
         | IntegerLiteral of string
         | FloatLiteral of string
         | Identifer of string
         | ConditionalExpr of op:CondOperators*left:Expr*right:Expr
+        | AddExpr of op:AddOperators*left:Expr*right:Expr
+        | MulExpr of op:MulOperators*left:Expr*right:Expr
+        | CallExpr of id: string * args:Expr list
     
     type Block =
         {
@@ -592,6 +619,10 @@ module Grammar =
     let GREATERTHENOREQUALOP = pString ">=" .>> (opt whitespace) |>> function _ -> GreaterThenOrEqual
     let EQUALOP = pchar '=' .>> (opt whitespace) |>> function _ -> Equal    
     let NOTEQUALOP = pString "!=" .>> (opt whitespace) |>> function _ -> NotEqual
+    let ADDOP = pchar '+' .>> (opt whitespace) |>> function _ -> Add
+    let SUBOP = pchar '-' .>> (opt whitespace) |>> function _ -> Sub
+    let MULOP = pchar '*' .>> (opt whitespace) |>> function _ -> Mul
+    let DIVOP = pchar '/' .>> (opt whitespace) |>> function _ -> Div
     let identifier = identifier' .>> (opt whitespace)
     
 
@@ -642,7 +673,41 @@ module Grammar =
 
     let expr', expr = recursiveDefP "expr"
 
-    expr' := numberLiteral <|> (identifier |>> Identifer)
+    let parenExpression = LPAREN >>. expr .>> RPAREN 
+
+
+    let expr_list = sepBy expr COMMA
+
+    let call_expr = 
+        parser {
+            let! id = identifier 
+            let! args = opt (LPAREN >>. expr_list .>> RPAREN)
+            return
+                match args with
+                | None -> Identifer id
+                | Some args -> CallExpr(id,args)
+        }
+
+    let primary = parenExpression <|> call_expr <|> numberLiteral
+
+    let rec factor = 
+        parser {
+            let! left = primary
+            match! opt ((MULOP <|> DIVOP) .>>. factor) with 
+            | None -> return left  
+            | Some (op,right) -> return MulExpr(op,left,right)
+        }
+
+    let rec term =
+        parser {
+            let! left = factor
+            match! opt ((ADDOP <|> SUBOP) .>>. term) with 
+            | None -> return left  
+            | Some (op,right) -> return AddExpr(op,left,right)
+        }
+
+
+    expr' := term
 
     // stmt
     let stmt',stmt = recursiveDefP "stmt"
@@ -792,6 +857,15 @@ module Grammar =
         | ConditionalExpr (o,l,r) ->
             let o = o.ToString()
             sprintf "%s %s %s" (exprToString l) o (exprToString r)
+        | AddExpr (o,l,r) ->
+            let o = o.ToString()
+            sprintf "%s %s %s" (exprToString l) o (exprToString r)
+        | MulExpr (o,l,r) ->
+            let o = o.ToString()
+            sprintf "%s %s %s" (exprToString l) o (exprToString r)
+        | CallExpr (i,args) ->
+            let args = args |> Seq.map exprToString |> String.concat ", "
+            sprintf "%s(%s)" i args
 
     let rec stmtToString (indent:string) (stmt:Stmt) =
         let bodyToString indent (body:Block) =
@@ -862,6 +936,49 @@ module Grammar =
             printfn "   END"
         )
         printfn "END"
+
+    let printParseTree (p:Program) =
+        printfn "%A" p
+        //printfn "PROGRAM %s" p.programName
+        //printfn "decls ["
+        //p.decls
+        //|> Seq.iter (fun decl ->
+        //    match decl with
+        //    | Decl.String (i,v) -> printfn "   DECL STRING id:%s, value: %s;" i v
+        //    | Decl.Int ids -> printfn "   DECL INT ids: [ %s ];" (ids |> String.concat "; ")
+        //    | Decl.Float ids -> printfn "   DECL FLOAT ids: [ %s ];" (ids |> String.concat "; ")
+        //)
+        //printfn "]"
+        //printfn "functions ["
+        //p.functions
+        //|> Seq.iter (fun func ->
+        //    let retType =
+        //        match func.returnType with
+        //        | ReturnType.Float -> "FLOAT"
+        //        | ReturnType.Int -> "INT"
+        //        | ReturnType.Void -> "VOID"
+            
+        //    printf "   FUNCTION %s %s" retType func.name
+        //    func.parameters
+        //    |> Seq.map (fun param ->
+        //        match param with
+        //        | ParamDecl.Int id -> sprintf "INT %s" id
+        //        | ParamDecl.Float id -> sprintf "FLOAT %s" id)
+        //    |> String.concat ","
+        //    |> printfn "(%s)"
+        //    printfn "   BEGIN"
+        //    func.decls
+        //    |> Seq.iter (fun decl ->
+        //        match decl with
+        //        | Decl.String (i,v) -> printfn "      STRING %s := %A;" i v
+        //        | Decl.Int ids -> printfn "      INT %s;" (ids |> String.concat ", ")
+        //        | Decl.Float ids -> printfn "      FLOAT %s;" (ids |> String.concat ", ")
+        //    )
+        //    func.stmts
+        //    |> Seq.iter (fun stmt -> stmtToString "      " stmt |> printfn "%s")
+        //    printfn "   END"
+        //)
+        //printfn "END"
 
 module CodeGen =
     open Calculator
@@ -996,7 +1113,11 @@ let main argv =
         let program = file |> fromStr |> run program
         match program with
         | Success (result,_) ->
-            printProgram result
+            //printProgram result
+            //printParseTree result
             //printfn "lastToken: %A" result.[result.Length-2]
-        | Failure _ -> printfn "%A" program
+            printfn "Accepted"
+        | Failure _ ->
+            //printfn "%A" program
+            printfn "Not Accepted"
     0 // return an integer exit code
