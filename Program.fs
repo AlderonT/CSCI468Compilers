@@ -1119,5 +1119,5 @@ let main argv =
             printfn "Accepted"
         | Failure _ ->
             //printfn "%A" program
-            printfn "Not Accepted"
+            printfn "Not accepted"
     0 // return an integer exit code
