@@ -26,6 +26,12 @@ each token in the form of:
 These values will be used by the parser in Step 2
 to build an Abstract Syntax Tree.
 
+As of Step 2, this files contains the Lexer and Parser which 
+prints out Accepted, or Not Accepted based on weather the provided
+file is accepted by the grammar or not. The Abstract Syntax Tree 
+can be displayed by adding -d or --display as a second argument 
+to the file.
+
 -----------------------------------------------------------------
 
 RUNNING THE PROJECT

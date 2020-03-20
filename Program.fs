@@ -1080,44 +1080,50 @@ open Calculator
 open Grammar
 
 let printUsage () = 
-    printfn "Usage: micro [-h|--help] <file_name>"
-    printfn "     -h|--help:   displays usage"
-    printfn "     file_name:   .micro source file to be processed"
+    printfn "Usage: micro [-h|--help] [-d|--display] <file_name>"
+    printfn "     -h|--help   :   displays usage"
+    printfn "     -d|--display:   displays the abstract syntax tree returned by the parser"
+    printfn "     file_name   :   .micro source file to be processed"
     
+type Options =
+    {
+        displayHelp : bool
+        errorMsg : string
+        displayParseTree: bool
+        filename : string
+    }
+
+let processArgs (args:string[]) =
+    args
+    |> Seq.mapi (fun i x -> i,x)
+    |> Seq.fold (fun options (i,arg) ->
+        match arg.ToLowerInvariant() with
+        | "-h" | "--help" ->  { options with displayHelp = true}
+        | "-d" | "--display" -> {options with displayParseTree = true}
+        | x when i = args.Length-1 -> {options with filename = x}
+        | x -> {options with displayHelp = true; errorMsg = sprintf "Unknown option '%s'" x}
+    ) { displayHelp = args.Length = 0; displayParseTree = false; filename = null; errorMsg = null }
 
 [<EntryPoint>]
 let main argv =
-    if argv.Length<1 then 
-        printUsage()
-    elif argv.[0] = "-h" || argv.[0] = "--help" then 
+
+    let options = processArgs argv
+    if options.errorMsg <> null then printfn "%s" options.errorMsg
+    if options.displayHelp then 
         printUsage()
     else 
-        //let printToken token = 
-        //    match token with 
-        //    | Whitespace 
-        //    | Comment -> ()
-        //    | Keyword k -> printfn "Token Type: KEYWORD\nValue: %s" k
-        //    | Operator o -> printfn "Token Type: OPERATOR\nValue: %s" o 
-        //    | Identifier i -> printfn "Token Type: IDENTIFIER\nValue: %s" i
-        //    | StringLiteral s -> printfn "Token Type: STRINGLITERAL\nValue: \"%s\"" s
-        //    | IntegerLiteral i -> printfn "Token Type: INTLITERAL\nValue: %s" i
-        //    | FloatLiteral f -> printfn "Token Type: FLOATLITERAL\nValue: %s" f
-
-        let file = System.IO.File.ReadAllText argv.[0]
-        //let tokenList = file |> fromStr |> run tokens
-        //match tokenList with
-        //| Success (result,_) ->
-        //    result |> Seq.iter printToken
-        //    //printfn "lastToken: %A" result.[result.Length-2]
-        //| Failure _ -> printfn "%A" tokenList
+        let file = System.IO.File.ReadAllText options.filename
         let program = file |> fromStr |> run program
         match program with
         | Success (result,_) ->
             //printProgram result
-            //printParseTree result
-            //printfn "lastToken: %A" result.[result.Length-2]
             printfn "Accepted"
-        | Failure _ ->
+            if options.displayParseTree then //display the parse tree
+                printParseTree result
+        | Failure _ as result ->
             //printfn "%A" program
             printfn "Not accepted"
+            if options.displayParseTree then
+                printResult result //Print Result is currently broken 
+                                   //(showing the top-level element containing an error) keep in mind
     0 // return an integer exit code
