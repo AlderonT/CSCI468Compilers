@@ -42,7 +42,12 @@ module rec AST =
                 this.symbols |>List.exists (fun (n,_) -> n = name)
             member this.addSymbol name entry = 
                 this.symbols <- (name,entry) :: this.symbols
-            member this.print () = 
+            
+            ////////////////////////////
+            // PRINT OUR SYMBOL TABLE //
+            ////////////////////////////
+            
+            member this.print () =                                                                  
                 printfn "Symbol table %s" this.name 
                 this.symbols |> List.iter (fun (s,ste) -> 
                     match ste with  
@@ -90,8 +95,8 @@ module rec AST =
                                     | _ -> ()
                                     loop rest 
                             loop f.stmts
-
                 )
+
     ///////////////////
     // AST
     ///////////////////
