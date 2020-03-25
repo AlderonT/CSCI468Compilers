@@ -1,4 +1,44 @@
+///////////////////////
+// CODE:
+///////////////////////
+
+PROGRAM example
+BEGIN
+	STRING s1 := "Bob";
+	INT i1;
+	FLOAT f1;
+
+	FUNCTION INT F1 (INT p1)
+	BEGIN
+		INT i2;
+
+		IF (i2<2)
+			i2:=2;
+		ENDIF
+	END
+
+	FUNCTION VOID F2 ()
+	BEGIN 
+		INT i3,i4;
+
+
+		WHILE (i3>i4)
+			i3 := F1(i4);
+			WRITE(i4);
+			IF(i3>i4)
+				i3:=1;
+				WRITE(i3);
+			ENDIF
+		ENDWHILE
+	END
+END
+
+///////////////////////
+// Symbol Tables:
+///////////////////////
+
 Symbol table GLOBAL				//program decls
+
 name s1 type STRING value "Bob"
 name i1 type INT
 name f1 type FLOAT
@@ -10,36 +50,11 @@ name i2 type INT
 Symbol table BLOCK 1			//if stmt decls
 
 Symbol table F2					//F2 decls
-name i3 type INT
+name i3 type INT 
 name i4 type INT
 
 Symbol table BLOCK 2			//while decls
 
 Symbol table BLOCK 3			//if decls
 
-
-PROGRAM example
-BEGIN
-	STRING s1 := "Bob";
-	INT i1;
-	FLOAT f1;
-
-	FUNCTION INT F1 (INT p1)
-	BEGIN
-		INT i2;
-		IF (i2<2)
-			i2:=2;
-		ENDIF
-	END
-
-	FUNCTION VOID F2 ()
-	BEGIN 
-		INT i3,i4;
-		WHILE (i3>i4)
-			IF(i3>i4)
-				i3:=1;
-			ENDIF
-		ENDWHILE
-	END
-END
 

@@ -6,11 +6,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="AST.fs" />
+    <Compile Include="Parser.fs" />
+    <Compile Include="Grammar.fs" />
+    <Compile Include="SemanticAnalyzer.fs" />
+    <Compile Include="CodeGen.fs" />
+    <Compile Include="Program.fs" />
     <None Include="test.il" />
     <None Include="hello.il" />
-    <Compile Include="Program.fs" />
   </ItemGroup>
-
-  <ItemGroup />
 
 </Project>

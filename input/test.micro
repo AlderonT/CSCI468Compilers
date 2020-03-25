@@ -7,6 +7,7 @@ BEGIN
 	FUNCTION INT F1 (INT p1)
 	BEGIN
 		INT i2;
+
 		IF (i2<2)
 			i2:=2;
 		ENDIF
@@ -15,9 +16,14 @@ BEGIN
 	FUNCTION VOID F2 ()
 	BEGIN 
 		INT i3,i4;
+
+
 		WHILE (i3>i4)
+			i3 := F1(i4);
+			WRITE(i4);
 			IF(i3>i4)
 				i3:=1;
+				WRITE(i3);
 			ENDIF
 		ENDWHILE
 	END
