@@ -49,7 +49,8 @@ module rec AST =
             
             member this.print () =                                                                  
                 printfn "Symbol table %s" this.name 
-                this.symbols |> List.iter (fun (s,ste) -> 
+                
+                this.symbols |> List.rev |> List.iter (fun (s,ste) -> 
                     match ste with  
                     | GlobalVariable (String (id,v)) -> printfn "name %s type STRING value %A" s v 
                     | GlobalVariable (Decl.Int id) -> printfn "name %s type INT" s  
@@ -95,7 +96,8 @@ module rec AST =
                                     | _ -> ()
                                     loop rest 
                             loop f.stmts
-                )
+                ) 
+                printfn ""
 
     ///////////////////
     // AST

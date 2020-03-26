@@ -32,7 +32,7 @@ module rec SemanticAnalyzer =
                 fixupStmts symTable blockIdx rest (fun rs -> stmt::rs |> cont)
 
     let rec populateBlockSymbolTables (blockIdx:int) (parent:SymbolTable) (b:Block): Result<Block*int,_> = 
-        let blockSymbolTable = SymbolTable.Create (sprintf "%d" blockIdx,parent)
+        let blockSymbolTable = SymbolTable.Create (sprintf "BLOCK %d" blockIdx,parent)
 
         let rec insertDecls decls =
             match decls with
