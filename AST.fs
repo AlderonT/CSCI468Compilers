@@ -64,6 +64,7 @@ module rec AST =
                         match f.symbolTable with 
                         |None -> ()
                         |Some st -> 
+                            printfn ""
                             st.print()
                             let rec loop stmts = 
                                 match stmts with 

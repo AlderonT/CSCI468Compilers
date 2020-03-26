@@ -38,7 +38,6 @@ END
 ///////////////////////
 
 Symbol table GLOBAL				//program decls
-
 name s1 type STRING value "Bob"
 name i1 type INT
 name f1 type FLOAT
