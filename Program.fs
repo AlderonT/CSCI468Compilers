@@ -45,7 +45,7 @@ module Program =
             match program with
             | Success (result,_) ->
                 //printProgram result
-                printfn "Accepted"
+                //printfn "Accepted"
                 if options.displayParseTree then //display the parse tree
                     printParseTree result
                 match SemanticAnalyzer.populateProgramSymbolTables result with
