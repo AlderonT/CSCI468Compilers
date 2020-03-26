@@ -4,8 +4,9 @@ open System
 #nowarn "40"
 module Program =      
     open Parser
-    open Calculator
     open Grammar
+    open SemanticAnalyzer
+
 
     let printUsage () = 
         printfn "Usage: micro [-h|--help] [-d|--display] <file_name>"
@@ -34,7 +35,6 @@ module Program =
 
     [<EntryPoint>]
     let main argv =
-
         let options = processArgs argv
         if options.errorMsg <> null then printfn "%s" options.errorMsg
         if options.displayHelp then 
@@ -48,6 +48,12 @@ module Program =
                 printfn "Accepted"
                 if options.displayParseTree then //display the parse tree
                     printParseTree result
+                match SemanticAnalyzer.populateProgramSymbolTables result with
+                | Error msg -> printfn "%s" msg
+                | Ok newProgram ->
+                    match newProgram.symbolTable with
+                    | None -> printfn "No Symbol Table to Print"
+                    |   Some st -> st.print()
             | Failure _ as result ->
                 //printfn "%A" program
                 printfn "Not accepted"
