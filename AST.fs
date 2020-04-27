@@ -42,7 +42,13 @@ module rec AST =
                 this.symbols |>List.exists (fun (n,_) -> n = name)
             member this.addSymbol name entry = 
                 this.symbols <- (name,entry) :: this.symbols
-            
+            member this.TryFind name =
+                match this.symbols |> List.tryFind (fun (n,_) -> n = name) with
+                | Some (_,entry) -> Some entry
+                | None ->
+                    match this.parent with
+                    | None -> None
+                    | Some parent -> parent.TryFind name
             ////////////////////////////
             // PRINT OUR SYMBOL TABLE //
             ////////////////////////////

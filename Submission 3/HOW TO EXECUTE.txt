@@ -1,0 +1,10 @@
+In Powershell:
+Run this line:
+Get-ChildItem -File .\test_files\ | foreach {$_.FullName;"";Get-Content $_.FullName;"";"-----------------------------------------";""; .\micro.exe $_.fullname;Start-Sleep -Seconds 2.5;cls}
+
+In Linux:
+Run this line:
+for filename in ./test_files/*.micro 
+do 
+    echo "${filename}"; echo ""; echo "-----------------------------------------"; echo ""; ./micro ${filename}; sleep 3s; printf "\033c"; 
+done

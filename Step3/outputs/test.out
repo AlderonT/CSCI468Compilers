@@ -26,7 +26,7 @@ BEGIN
 			i3 := F1(i4);
 			WRITE(i4);
 			IF(i3>i4)
-				i3:=1;
+				i3:=i4+1;
 				WRITE(i3);
 			ENDIF
 		ENDWHILE

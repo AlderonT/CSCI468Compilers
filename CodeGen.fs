@@ -2,6 +2,114 @@
 
 open System
 #nowarn "40"
+open AST
+
+module IRGeneration = 
+    type Operand = 
+        |GlobalRef 
+        |LocalRef 
+        |TempRef
+        |IntConstant of int 
+        |FloatConstant of float
+
+    type IR = 
+        |ADDI of  Operand*Operand*Operand
+        |MULI of Operand*Operand*Operand
+        |ADDF of  Operand*Operand*Operand
+        |MULF of Operand*Operand*Operand
+        |STOREI of Operand*Operand
+        |READI of Operand 
+        |WRITEI of Operand 
+        |WRITES of Operand 
+
+    type IRType = 
+        | Integer
+        | Float
+        | Boolean
+        | Unit
+
+    type codeBlock = 
+        {
+            typ:IRType
+            instr: List<IR>
+            vars: List<IRType>
+        }
+
+    //let rec generateIRExpr (expr:AST.Expr):codeBlock = 
+    //    match expr with 
+    //    | IntegerLiteral s -> 
+    //        {
+    //            typ = Integer
+    //            instr = [] 
+    //            vars = []
+    //        }
+    //    | FloatLiteral s -> 
+    //        {
+    //            typ = Float
+    //            instr = [] 
+    //            vars = []
+    //        }
+    //    | Identifer s -> 
+    //        {
+    //            typ = match float s with 
+    //                | f where typeof f = Float  -> Float 
+    //                | _ -> Integer
+    //            instr = [] 
+    //            vars = [
+    //                match float s with 
+    //                | f where typeof f = Float  -> Float 
+    //                | _ -> Integer
+    //                ]
+    //        }
+    //    | AddExpr (op,l,r) -> 
+    //        let lexpr =  generateIRExpr l
+    //        let rexpr =  generateIRExpr r
+    //        let instr =
+    //            if lexpr.typ = Float && lexpr.typ = rexpr.typ then 
+    //                ADDI (TempRef,lexpr.instr.Head.[0],rexpr.instr.Head.[0]) //the thing we're writing into goes first followed by the returned values of the left and right side
+    //            else 
+    //                ADDF (TempRef,lexpr.instr.Head.[0],rexpr.instr.Head.[0]) //the thing we're writing into goes first followed by the returned values of the left and right side
+    //        {
+    //            typ = 
+    //                match instr with 
+    //                | ADDI(_,_,_) -> Integer
+    //                | ADDF(_,_,_) -> Float
+    //                | _ -> Integer
+    //            instr = instr :: (List.append lexpr.instr rexpr.instr)
+    //            vars = Integer :: (List.append lexpr.vars rexpr.vars) // not really sure what I'm doing here but there's no red
+    //        }
+    //    | MulExpr (op,l,r) -> 
+    //        let lexpr =  generateIRExpr l
+    //        let rexpr =  generateIRExpr r
+    //        let instr =
+    //            if lexpr.typ = Float && lexpr.typ = rexpr.typ then 
+    //                MULI (TempRef,lexpr.instr.Head.[0],rexpr.instr.Head.[0]) //the thing we're writing into goes first followed by the returned values of the left and right side
+    //            else 
+    //                MULF (TempRef,lexpr.instr.Head.[0],rexpr.instr.Head.[0]) //the thing we're writing into goes first followed by the returned values of the left and right side
+    //        {
+    //            typ = 
+    //                match instr with 
+    //                | MULI(_,_,_) -> Integer
+    //                | MULF(_,_,_) -> Float
+    //                | _ -> Integer
+    //            instr = instr :: (List.append lexpr.instr rexpr.instr)
+    //            vars = Integer :: (List.append lexpr.vars rexpr.vars) // not really sure what I'm doing here but there's no red
+    //        }
+    //    | CallExpr (id,args) ->
+    //        let instrs = args |> List.map generateIRExpr >> (fun a -> WRITEI a)|> Set |> List 
+    //        {
+    //            typ = Unit 
+    //            instr =  instrs
+    //            vars = []
+    //        }
+    //    | ConditionalExpr (op,l,r) -> 
+    //        let lexpr =  generateIRExpr l
+    //        let rexpr =  generateIRExpr r
+    //        {
+    //            typ = Boolean
+    //            instr =  (List.append lexpr.instr rexpr.instr)
+    //            vars = []
+    //        }
 
 module Calculator =
     open Parser
