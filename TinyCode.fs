@@ -251,7 +251,8 @@ module TinyCode =
                     failwithf "Attempting to mix types in a math expression"
         | notSupportedYet -> failwithf "%A not supported yet" notSupportedYet
 
-    let addExprInstructions (op,l,r) regNum = 
-        match op with 
-        | Add -> 
-        | Sub -> 
+    let stmtToCode (symTable:SymbolTable) (stmt:Stmt) regNum = 
+        match stmt with 
+        | Read id -> 
+            match (symTable.TryFind id) with 
+            | None -> 
