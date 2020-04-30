@@ -5,8 +5,6 @@ VisualStudioVersion = 16.0.29326.143
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "micro", "micro.fsproj", "{9420265C-D51C-4C78-896D-A6877EC60C0A}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Interpreter", "..\Interpreter\Interpreter.vcxproj", "{8C7B6C3A-5924-4D4E-BEB3-64EAA01942E5}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -29,16 +27,6 @@ Global
 		{9420265C-D51C-4C78-896D-A6877EC60C0A}.Release|x64.Build.0 = Release|Any CPU
 		{9420265C-D51C-4C78-896D-A6877EC60C0A}.Release|x86.ActiveCfg = Release|Any CPU
 		{9420265C-D51C-4C78-896D-A6877EC60C0A}.Release|x86.Build.0 = Release|Any CPU
-		{8C7B6C3A-5924-4D4E-BEB3-64EAA01942E5}.Debug|Any CPU.ActiveCfg = Debug|Win32
-		{8C7B6C3A-5924-4D4E-BEB3-64EAA01942E5}.Debug|x64.ActiveCfg = Debug|x64
-		{8C7B6C3A-5924-4D4E-BEB3-64EAA01942E5}.Debug|x64.Build.0 = Debug|x64
-		{8C7B6C3A-5924-4D4E-BEB3-64EAA01942E5}.Debug|x86.ActiveCfg = Debug|Win32
-		{8C7B6C3A-5924-4D4E-BEB3-64EAA01942E5}.Debug|x86.Build.0 = Debug|Win32
-		{8C7B6C3A-5924-4D4E-BEB3-64EAA01942E5}.Release|Any CPU.ActiveCfg = Release|Win32
-		{8C7B6C3A-5924-4D4E-BEB3-64EAA01942E5}.Release|x64.ActiveCfg = Release|x64
-		{8C7B6C3A-5924-4D4E-BEB3-64EAA01942E5}.Release|x64.Build.0 = Release|x64
-		{8C7B6C3A-5924-4D4E-BEB3-64EAA01942E5}.Release|x86.ActiveCfg = Release|Win32
-		{8C7B6C3A-5924-4D4E-BEB3-64EAA01942E5}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

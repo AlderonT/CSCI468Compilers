@@ -21,7 +21,7 @@ module TinyCode =
                 | StringID i -> i
 
     type Instruction =
-        | Var   of name   : string 
+        | Var   of name   :string 
         | Str   of name   :InstructionOperand*value:string
         | Label of target :string
         | Move  of source :InstructionOperand*destination:InstructionOperand
@@ -60,8 +60,8 @@ module TinyCode =
             member this.Text = 
                 match this with 
                 | Var n      -> sprintf "var %s" n 
-                | Str (n,s)  -> sprintf  "str %s \"%s\"" n.Text s 
-                | Label n    ->  sprintf "label %s" n 
+                | Str (n,s)  -> sprintf "str %s \"%s\"" n.Text s 
+                | Label n    -> sprintf "label %s" n 
                 | Move (s,d) -> sprintf "move %s %s" s.Text d.Text 
                 | AddI (o,r) -> sprintf "addi %s %s" o.Text r.Text 
                 | AddR (o,r) -> sprintf "addr %s %s" o.Text r.Text 
@@ -95,49 +95,19 @@ module TinyCode =
                 | SysHalt    -> "sys halt"
                 | End        -> "end"
 
-    type Code = Instruction List 
+    type Code = seq<Instruction>
 
     let printInstructions (is:Code) = 
         is
-        |>List.iter (fun i -> printfn "%s" i.Text)
+        |>Seq.iter (fun i -> printfn "%s" i.Text)
 
-    let progT1 () = 
-        [
-            Var "length" 
-            Str (StringID "star", "*")
-            Str (StringID "prompt", "enter number: ")
-            Str (StringID "eol","\\n" )
-            Move ((IntConstant 0), (Register 2))
-            SysWriteS (StringID "prompt")
-            SysReadI (Memory "length")
-            Move ((IntConstant 1), (Register 3))
-            Label "outerloop"
-            Move ((IntConstant 3), (Register 0))
-            Label "starloop"
-            SysWriteS (StringID "star")
-            SubI ((IntConstant 1), (Register 0))
-            CmpI ((IntConstant 0), (Register 0))
-            Jne "starloop"
-            SysWriteS (StringID "eol")
-            AddI ((IntConstant 1), (Register 3))
-            CmpI ((Memory "length"), (Register 3))
-            Jge "outerloop"
-            Move ((IntConstant 1), (Register 3))
-            AddI ((IntConstant 1), (Register 2))
-            CmpI ((IntConstant 4), (Register 2))
-            Jge "outerloop"
-            SysHalt
-            End
-        ]
-        |> printInstructions
+    let concatInstructions (is:Code) = 
+        is
+        |>Seq.map (fun i -> sprintf "%s" i.Text)
+        |>String.concat "\n"
 
-    let baseExprToInstructionOperand (expr:Expr) =
-        match expr with 
-        | IntegerLiteral i -> IntConstant (int i)
-        | FloatLiteral i -> FloatConstant (float i)
-        | Identifer id -> Memory id
-        | _ -> failwith "BAD EXPRESSION SEE TinyCode.fs Ln 135"
-
+    let writeCodeToFile (code:string)  = 
+        System.IO.File.WriteAllText("D:\Spring2020\SmallC\\tinyTest.tiny",code)
 
     type CodeBlock =
         {
@@ -147,10 +117,6 @@ module TinyCode =
         }
         with
             static member New instrs nextRegister exprType = { instrs = instrs; nextRegister = nextRegister; exprType = exprType }
-    type ExpressionReturnType = 
-    | Integer 
-    | Float
-    | SID
 
     type ExprIR = 
         {
@@ -158,9 +124,6 @@ module TinyCode =
             instructions: List<Instruction>
             returnRegister: int 
         }
-    
-    let searchSymbolTableForType identifier = 
-        Integer
 
     let rec exprToCode (symTable:SymbolTable) (expr:Expr) regNum =
         match expr with 
@@ -186,7 +149,6 @@ module TinyCode =
                         | Decl.Float _ -> VarType.Float
             let instr = Move (Memory n,Register regNum)
             CodeBlock.New [instr] (regNum+1) exprType
-        //| ConditionalExpr _ -> failwith "CONDITIONALS UNSUPPORTED"
         | AddExpr (op,l,r) ->
             match op with
             | Add ->
@@ -251,8 +213,64 @@ module TinyCode =
                     failwithf "Attempting to mix types in a math expression"
         | notSupportedYet -> failwithf "%A not supported yet" notSupportedYet
 
-    let stmtToCode (symTable:SymbolTable) (stmt:Stmt) regNum = 
+    let genStmt (symTable:SymbolTable) (stmt:Stmt) regNum = 
         match stmt with 
-        | Read id -> 
+        | Read ids -> 
+            ids |> Seq.collect (fun id ->
             match (symTable.TryFind id) with 
-            | None -> 
+            | None -> failwithf "Symbol %s not found" id 
+            | Some decl -> 
+                match decl with 
+                | GlobalVariable var -> 
+                    match var with 
+                    | Decl.Int id-> [SysReadI (Memory id)]
+                    | Decl.Float id-> [SysReadR (Memory id)]
+                    | Decl.String (id,_)-> failwithf "Unable to read the type of %s" id
+                | _ -> failwithf "Only Global variables are accepted"
+            )
+        | Write ids -> 
+            ids |> Seq.collect (fun id ->
+            match (symTable.TryFind id) with 
+            | None -> failwithf "Symbol %s not found" id 
+            | Some decl -> 
+                match decl with 
+                | GlobalVariable var -> 
+                    match var with 
+                    | Decl.Int id-> [SysWriteI (Memory id)]
+                    | Decl.Float id-> [SysWriteR (Memory id)]
+                    | Decl.String (id,_)-> [SysWriteS (Memory id)]
+                | _ -> failwithf "Only Global variables are accepted"            
+            )
+        | Assign (lh,rh) -> 
+            match symTable.TryFind lh with 
+            | None -> failwithf "Symbol %s not found" lh 
+            | Some decl -> 
+                match decl with 
+                | GlobalVariable id -> 
+                    Seq.concat [(exprToCode symTable rh regNum).instrs;[Move ((Register regNum),(Memory lh))]]
+                | _ -> failwithf "Only Global variables are accepted"
+        | _ -> failwithf "Unsupported Operation %A" stmt
+
+    let genFuncDeclInstrs (symTable:SymbolTable) (func:FuncDecl) = 
+        seq {
+            yield!
+                func.stmts
+                |> Seq.collect (fun x -> genStmt symTable x 0)
+            yield SysHalt
+        }
+
+    let genProgram (prog:Program) = 
+        let globalDecls = 
+            prog.decls
+            |> Seq.map (fun decl ->
+                match decl with 
+                | String (id,lit) -> Str (Memory id,lit)
+                | Decl.Int i -> Var i 
+                | Decl.Float f -> Var f
+            )
+        let mainFn = 
+            prog.functions |> List.tryFind (fun f -> f.name = "main") |> (fun d -> if d.IsNone then failwithf "No Main Function Found!" else d.Value)
+        match prog.symbolTable with 
+        | Some symTbl -> seq {globalDecls; genFuncDeclInstrs symTbl mainFn} |> Seq.concat
+        | None -> failwithf "Symbol Table Failed to generate!"
+

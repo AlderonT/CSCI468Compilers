@@ -2,7 +2,8 @@ PROGRAM p
 BEGIN
 
 	INT a,b,c;
-	
+	STRING eol := "\n";
+
 	FUNCTION VOID main()
 	BEGIN
 		
@@ -18,15 +19,12 @@ BEGIN
 
 		a := (b*a)/a;
 
-		IF (i2<2)
-			i2:=2;
-		ELSE
-			i2:=1;
-		ENDIF
-
 		WRITE (c);
+		WRITE (eol);
 		WRITE (b);
+		WRITE (eol);
 		WRITE (a);
+		WRITE (eol);
 	
 	END
 END

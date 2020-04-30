@@ -1,0 +1,45 @@
+var a
+var b
+var c
+str eol "\n"
+move 20 r0
+move r0 a
+move 30 r0
+move r0 b
+move 40 r0
+move r0 c
+move c r0
+move a r1
+move b r2
+muli r2 r1
+move a r2
+move a r3
+move b r4
+muli r4 r3
+move c r4
+addi r4 r3
+divi r3 r2
+move 20 r3
+addi r3 r2
+addi r2 r1
+addi r1 r0
+move r0 c
+move b r0
+move b r1
+muli r1 r0
+move a r1
+addi r1 r0
+move r0 b
+move a r0
+move b r1
+move a r2
+muli r2 r1
+divi r1 r0
+move r0 a
+sys writei c
+sys writes eol
+sys writei b
+sys writes eol
+sys writei a
+sys writes eol
+sys halt

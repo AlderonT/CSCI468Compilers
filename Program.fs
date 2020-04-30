@@ -6,6 +6,7 @@ module Program =
     open Parser
     open Grammar
     open SemanticAnalyzer
+    open TinyCode
 
 
     let printUsage () = 
@@ -50,10 +51,7 @@ module Program =
                     printParseTree result
                 match SemanticAnalyzer.populateProgramSymbolTables result with
                 | Error msg -> printfn "%s" msg
-                | Ok newProgram ->
-                    match newProgram.symbolTable with
-                    | None -> printfn "No Symbol Table to Print"
-                    |   Some st -> st.print()
+                | Ok newProgram -> genProgram newProgram |> concatInstructions |> writeCodeToFile
             | Failure _ as result ->
                 //printfn "%A" program
                 printfn "Not accepted"
