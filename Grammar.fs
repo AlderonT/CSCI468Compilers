@@ -1,8 +1,7 @@
 ﻿namespace micro
 
 open System
-#nowarn "40"
-     
+#nowarn "40"  
     
 module Grammar = 
     open Parser

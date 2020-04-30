@@ -174,6 +174,7 @@ module rec AST =
             stmts : Stmt list
             symbolTable: SymbolTable option
         }
+
     and Stmt =
         | Read of ids: string list
         | Write of ids: string list 
