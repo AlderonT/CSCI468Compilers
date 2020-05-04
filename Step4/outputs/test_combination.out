@@ -39,6 +39,7 @@ muli a r13
 move r13 r14
 divi a r14
 move r14 a
+
 sys writei c
 sys writei b
 sys writei a

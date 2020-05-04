@@ -41,6 +41,7 @@ module Program =
         if options.displayHelp then 
             printUsage()
         else 
+            let filename = System.IO.Path.ChangeExtension(options.filename,"tiny")
             let file = System.IO.File.ReadAllText options.filename
             let program = file |> fromStr |> run program
             match program with
@@ -51,7 +52,7 @@ module Program =
                     printParseTree result
                 match SemanticAnalyzer.populateProgramSymbolTables result with
                 | Error msg -> printfn "%s" msg
-                | Ok newProgram -> genProgram newProgram |> concatInstructions |> writeCodeToFile
+                | Ok newProgram -> genProgram newProgram |> concatInstructions |> writeCodeToFile filename
             | Failure _ as result ->
                 //printfn "%A" program
                 printfn "Not accepted"

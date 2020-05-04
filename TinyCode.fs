@@ -106,8 +106,8 @@ module TinyCode =
         |>Seq.map (fun i -> sprintf "%s" i.Text)
         |>String.concat "\n"
 
-    let writeCodeToFile (code:string)  = 
-        System.IO.File.WriteAllText("D:\Spring2020\SmallC\\tinyTest.tiny",code)
+    let writeCodeToFile file (code:string)   = 
+        System.IO.File.WriteAllText(file,code)
 
     type CodeBlock =
         {
@@ -124,6 +124,44 @@ module TinyCode =
             instructions: List<Instruction>
             returnRegister: int 
         }
+    
+    //OPTIMIZATIONS:
+    
+    let (|IsMoveSafe|_|) (op:InstructionOperand)= 
+        match op with 
+        | Memory _ 
+        | StringID _ -> None
+        | _ -> Some op
+
+    let (|Instr|_|) (instr:Instruction)= 
+        match instr with 
+        //| Move (a,IsMoveSafe b) 
+        //| Move (IsMoveSafe a,b) -> Some (Move,a,b)
+        | AddI (a,b) -> Some (AddI,a,b)
+        | AddR (a,b) -> Some (AddR,a,b)
+        | SubI (a,b) -> Some (SubI,a,b)
+        | SubR (a,b) -> Some (SubR,a,b)
+        | MulI (a,b) -> Some (MulI,a,b)
+        | MulR (a,b) -> Some (MulR,a,b)
+        | DivI (a,b) -> Some (DivI,a,b)
+        | DivR (a,b) -> Some (DivR,a,b)
+        | _ -> None
+
+    let peepholeOptimize (code:Code) =
+        let rec peepholeOptimize (code:List<Instruction>) cont = 
+            match code with 
+            | (Move (a,b) as m1) :: (Move (c,d) as m2) :: (Instr (_,e,IsMoveSafe f) as i) :: rest when (b = e) && (d = f) -> 
+                peepholeOptimize (m2::m1::i::rest) cont
+            | (Move (IsMoveSafe s,d) as m1) :: (Move (s', d') as i) :: rest  
+            | (Move (s,d) as m1) :: (Move (s', IsMoveSafe d') as i) :: rest when d=s'-> 
+                peepholeOptimize (Move (s,d')::rest) cont // need to fix Instr to check if something is one of several expressions
+            | (Move (s,d) as m1) :: (Instr (c,s', d') as i) :: rest when d=s'-> 
+                peepholeOptimize (c (s,d')::rest) cont // need to fix Instr to check if something is one of several expressions
+            | instr::rest -> peepholeOptimize rest (fun rs -> instr::rs |> cont)
+            | [] -> cont []
+        peepholeOptimize (code |> List.ofSeq) Seq.ofList
+
+    //CODE GEN
 
     let rec exprToCode (symTable:SymbolTable) (expr:Expr) regNum =
         match expr with 
@@ -167,8 +205,8 @@ module TinyCode =
                     failwithf "Attempting to mix types in a math expression"                
             | Sub ->
                 // we re-order subtraction so that we can minimize the number of used registers
-                let left = exprToCode symTable r regNum
-                let right = exprToCode symTable l left.nextRegister
+                let left = exprToCode symTable l regNum
+                let right = exprToCode symTable r left.nextRegister
                 if left.exprType = right.exprType then
                     let addInstr =
                         let args = Register left.nextRegister, Register regNum
@@ -198,8 +236,8 @@ module TinyCode =
                     failwithf "Attempting to mix types in a math expression"                
             | Div ->
                 // we re-order subtraction so that we can minimize the number of used registers
-                let left = exprToCode symTable r regNum
-                let right = exprToCode symTable l left.nextRegister
+                let left = exprToCode symTable l regNum
+                let right = exprToCode symTable r left.nextRegister
                 if left.exprType = right.exprType then
                     let mulInstr =
                         let args = Register left.nextRegister, Register regNum
@@ -247,7 +285,8 @@ module TinyCode =
             | Some decl -> 
                 match decl with 
                 | GlobalVariable id -> 
-                    Seq.concat [(exprToCode symTable rh regNum).instrs;[Move ((Register regNum),(Memory lh))]]
+                    Seq.concat [(exprToCode symTable rh regNum).instrs;[Move ((Register regNum),(Memory lh))]] 
+                    |> peepholeOptimize
                 | _ -> failwithf "Only Global variables are accepted"
         | _ -> failwithf "Unsupported Operation %A" stmt
 
@@ -274,3 +313,14 @@ module TinyCode =
         | Some symTbl -> seq {globalDecls; genFuncDeclInstrs symTbl mainFn} |> Seq.concat
         | None -> failwithf "Symbol Table Failed to generate!"
 
+    let testCode = 
+        [
+            Move ((Memory "a"),Register 0)
+            Move ((Memory "b"),Register 1)
+            AddI ((Register 1),Register 0)
+            Move ((Memory "b"),Register 1)
+            Move ((Memory "a"),Register 0)
+            AddI ((Register 1),Register 0)
+        ]
+
+    

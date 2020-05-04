@@ -2,7 +2,7 @@ PROGRAM p
 BEGIN
 
 	INT a,b,c;
-	STRING eol := "\n";
+	--STRING eol := "\n";
 
 	FUNCTION VOID main()
 	BEGIN
@@ -12,6 +12,8 @@ BEGIN
 		b := 30;
 
 		c := 40;
+
+		--c := c;
 				
 		c := c + a*b + (a*b+c)/a + 20;
 
@@ -20,11 +22,11 @@ BEGIN
 		a := (b*a)/a;
 
 		WRITE (c);
-		WRITE (eol);
+		--WRITE (eol);
 		WRITE (b);
-		WRITE (eol);
+		--WRITE (eol);
 		WRITE (a);
-		WRITE (eol);
+		--WRITE (eol);
 	
 	END
 END
