@@ -211,7 +211,7 @@ module TinyCode =
     let rec reduceExpr (expr:Expr) =
         match expr with
         | NegateExpr (NegateExpr expr) -> expr
-        | NegateExpr _
+        | NegateExpr (expr) -> NegateExpr (reduceExpr expr)
         | ReciprocalExpr _
         | IntegerLiteral _
         | FloatLiteral _
