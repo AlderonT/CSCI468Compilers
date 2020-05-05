@@ -347,15 +347,15 @@ module TinyCode =
                         | VarType.Float -> AddR args
                     let subInstr =
                         match left.exprType with
-                        | VarType.Int -> SubI (InstructionOperand.IntConstant 0,Register regNum)
-                        | VarType.Float -> SubR (InstructionOperand.FloatConstant 0.0,Register regNum)
+                        | VarType.Int -> MulI (InstructionOperand.IntConstant -1,Register regNum)
+                        | VarType.Float -> MulR (InstructionOperand.FloatConstant -1.0,Register regNum)
                     let instrs =
                         left.instrs @ right.instrs @ [addInstr; subInstr]
                     CodeBlock.New instrs (regNum+1) left.exprType
                 else
                     failwithf "Attempting to mix types in a math expression"                
-            | NegateExpr d, s
-            | s, NegateExpr d ->
+            | d, NegateExpr s
+            | NegateExpr s, d ->
                 let left = exprToCode symTable d regNum
                 let right = exprToCode symTable s left.nextRegister
                 if left.exprType = right.exprType then
@@ -390,21 +390,28 @@ module TinyCode =
                 let right = exprToCode symTable r left.nextRegister
                 if left.exprType = right.exprType then
                     let mulInstr =
-                        let args = Register left.nextRegister, Register regNum
+                        let args = Register regNum, Register left.nextRegister
                         match left.exprType with
                         | VarType.Int -> MulI args
                         | VarType.Float -> MulR args
+                    let move1 =
+                        match left.exprType with
+                        | VarType.Int -> Move (InstructionOperand.IntConstant 1, Register regNum)
+                        | VarType.Float -> DivR (InstructionOperand.FloatConstant 1.0, Register regNum)
                     let divInstr =
                         match left.exprType with
-                        | VarType.Int -> DivI (InstructionOperand.IntConstant 1, Register regNum)
-                        | VarType.Float -> DivR (InstructionOperand.FloatConstant 1.0, Register regNum)
+                        | VarType.Int -> DivI (Register left.nextRegister, Register regNum)
+                        | VarType.Float -> DivR (Register left.nextRegister, Register regNum)
                     let instrs =
-                        left.instrs @ right.instrs @ [mulInstr; divInstr]
+                        match left.exprType with
+                        | VarType.Int -> [Move (InstructionOperand.IntConstant 0, Register regNum)]
+                        | VarType.Float ->
+                            left.instrs @ right.instrs @ [mulInstr; move1; divInstr]
                     CodeBlock.New instrs (regNum+1) left.exprType
                 else
                     failwithf "Attempting to mix types in a math expression"                
-            | ReciprocalExpr d, s
-            | s, ReciprocalExpr d ->
+            | d, ReciprocalExpr s
+            | ReciprocalExpr s, d ->
                 let left = exprToCode symTable d regNum
                 let right = exprToCode symTable s left.nextRegister
                 if left.exprType = right.exprType then
@@ -436,19 +443,23 @@ module TinyCode =
             let left = exprToCode symTable inner regNum
             let subInstr =
                 match left.exprType with
-                | VarType.Int -> SubI (InstructionOperand.IntConstant 0,Register regNum)
-                | VarType.Float -> SubR (InstructionOperand.FloatConstant 0.0,Register regNum)
+                | VarType.Int -> MulI (InstructionOperand.IntConstant -1,Register regNum)
+                | VarType.Float -> MulR (InstructionOperand.FloatConstant -1.0,Register regNum)
             let instrs =
                 left.instrs @ [subInstr]
             CodeBlock.New instrs (regNum+1) left.exprType
         | ReciprocalExpr inner ->
-            let left = exprToCode symTable inner regNum
+            let left = exprToCode symTable inner (regNum+1)
+            let move1 =
+                match left.exprType with
+                | VarType.Int -> Move (InstructionOperand.IntConstant 1, Register regNum)
+                | VarType.Float -> Move (InstructionOperand.FloatConstant 1.0, Register regNum)
             let divInstr =
                 match left.exprType with
-                | VarType.Int -> DivI (InstructionOperand.IntConstant 1, Register regNum)
-                | VarType.Float -> DivR (InstructionOperand.FloatConstant 1.0, Register regNum)
+                | VarType.Int -> DivI (Register (regNum+1), Register regNum)
+                | VarType.Float -> DivR (Register (regNum+1), Register regNum)
             let instrs =
-                left.instrs @ [divInstr]
+                left.instrs @ [move1; divInstr]
             CodeBlock.New instrs (regNum+1) left.exprType
         | notSupportedYet -> failwithf "%A not supported yet" notSupportedYet
 

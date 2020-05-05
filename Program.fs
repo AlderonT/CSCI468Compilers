@@ -52,7 +52,7 @@ module Program =
                     printParseTree result
                 match SemanticAnalyzer.populateProgramSymbolTables result with
                 | Error msg -> printfn "%s" msg
-                | Ok newProgram -> genProgram newProgram |> concatInstructions |>  writeCodeToFile filename //writeCodeToConsole
+                | Ok newProgram -> genProgram newProgram |> concatInstructions |>  writeCodeToConsole //writeCodeToFile filename 
             | Failure _ as result ->
                 //printfn "%A" program
                 printfn "Not accepted"
