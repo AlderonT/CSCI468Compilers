@@ -4,7 +4,6 @@
     <TargetFramework>netcoreapp3.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <None Include="tiny.fsx" />
     <Compile Include="AST.fs" />
     <Compile Include="Parser.fs" />
     <Compile Include="Grammar.fs" />

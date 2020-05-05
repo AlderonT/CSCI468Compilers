@@ -210,12 +210,27 @@ module TinyCode =
 
     let rec reduceExpr (expr:Expr) =
         match expr with
-        | NegateExpr (NegateExpr expr) -> expr
-        | NegateExpr (expr) -> NegateExpr (reduceExpr expr)
-        | ReciprocalExpr _
+        | NegateExpr inner ->
+            let inner' = reduceExpr inner
+            match inner' with
+            | NegateExpr expr -> expr // if the inner expression is now a Negate then we pass expr up since Negate(Negate ...) = ...
+            | IntegerLiteral s -> IntegerLiteral (string (-(int s)))
+            | FloatLiteral s -> FloatLiteral (string (-(float s)))
+            | expr -> NegateExpr expr // if anything else then wrapped the fixed up expr in the NegateExpr container
+        | ReciprocalExpr inner ->
+            let inner' = reduceExpr inner
+            match inner' with
+            | ReciprocalExpr expr -> expr // if the inner expression is now a Negate then we pass expr up since 1/(1/a) = a
+            // we are not going to do integer
+            | FloatValue f -> FloatLiteral (string (1.0/f))
+            | expr -> ReciprocalExpr expr
         | IntegerLiteral _
         | FloatLiteral _
         | Identifer _ -> expr
+        | AddExpr (NegateExpr a, NegateExpr b) -> reduceExpr (AddExpr (a,b)) |> NegateExpr
+        | MulExpr (NegateExpr a, NegateExpr b) -> reduceExpr (MulExpr (a,b))
+        | MulExpr (NegateExpr a, b) -> reduceExpr (MulExpr (a,b)) |> NegateExpr
+        | MulExpr (a, NegateExpr b) -> reduceExpr (MulExpr (a,b)) |> NegateExpr
         | AddExpr _ as addExpr ->
             let rec loop expr (literalExpr:Expr option,positives:Expr list,negatives:Expr list) =
                 let addLiteral (litExpr:Expr option) (other:Expr) =
