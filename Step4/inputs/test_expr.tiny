@@ -1,0 +1,248 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+var a
+var b
+var c
+var d
+var x
+var y
+var z
+var t
+str newline "\n"
+move 1 a
+move 2 b
+move 10 c
+move 20 d
+sys writei a
+sys writes newline
+sys writei b
+sys writes newline
+sys writei c
+sys writes newline
+sys writei d
+sys writes newline
+move a r0
+addi b r0
+move r0 a
+sys writei a
+sys writes newline
+move a r0
+muli c r0
+move r0 b
+sys writei b
+sys writes newline
+move a r0
+subi b r0
+move r0 c
+sys writei c
+sys writes newline
+move d r0
+subi 0 r0
+move r0 d
+sys writei d
+sys writes newline
+move a r0
+move a r1
+move b r2
+move c r3
+addi d r3
+addi r3 r2
+addi r2 r1
+divi r1 r0
+move a r1
+addi b r1
+move d r2
+addi c r2
+muli r2 r1
+subi r1 r0
+move r0 a
+sys writei a
+sys writes newline
+move 10 r0
+addi a r0
+move r0 a
+sys writei a
+sys writes newline
+move 10 r0
+move b r1
+addi a r1
+addi r1 r0
+move r0 b
+sys writei b
+sys writes newline
+move 10 r0
+subi 0 r0
+move r0 c
+sys writei c
+sys writes newline
+move 1.000000 x
+move 2.000000 y
+move 3.141590 z
+sys writer x
+sys writes newline
+sys writer z
+sys writes newline
+sys writer y
+sys writes newline
+move 2.000000 r0
+divr z r0
+move r0 x
+move y r0
+divr z r0
+move r0 y
+sys writer x
+sys writes newline
+sys writer y
+sys writes newline
+move z r0
+move x r1
+addr y r1
+addr z r1
+divr r1 r0
+move r0 t
+sys writer t
+sys writes newline
+move t r0
+mulr t r0
+move r0 t
+sys writer t
+sys writes newline
+move t r0
+addr z r0
+addr t r0
+move 2.000000 r1
+divr t r1
+addr r1 r0
+move 4.000000 r1
+divr z r1
+addr r1 r0
+move 5.000000 r1
+divr z r1
+addr r1 r0
+move 6.000000 r1
+divr z r1
+addr r1 r0
+move 7.000000 r1
+divr z r1
+addr r1 r0
+move r0 t
+sys writer t
+sys writes newline
+sys halt

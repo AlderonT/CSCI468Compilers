@@ -7,29 +7,6 @@ module Grammar =
     open Parser
     open AST
 
-    let numberLiteral = 
-        let digits = many1 parseDigit |>> (List.toArray >> System.String)
-        parser {
-            match! opt (pchar '.' >>. digits) with 
-            | Some fraction -> 
-                return fraction |> sprintf ".%s"|> FloatLiteral
-            | None -> 
-                let! prefix = digits
-                match! opt (pchar '.' >>. digits) with 
-                | Some fraction -> 
-                    return fraction |> sprintf "%s.%s" prefix |>FloatLiteral
-                | None -> return prefix |> IntegerLiteral
-                
-        }
-    let stringLiteral = 
-        let nonDoubleQuote = satisfy (fun c -> c <> '\"') "notDoubleQuote"
-        let insideString = many nonDoubleQuote |>> (List.toArray >> System.String)
-        parser {
-            do! pchar '\"' |> ignoreP
-            let! str = insideString
-            do! pchar '\"' |> ignoreP
-            return (str : string)
-        }
     let comment = 
         let nonNewLine = satisfy (fun c -> c <> '\n') "notNewLine"
         let insideComment = many nonNewLine|>> (List.toArray >> System.String)
@@ -51,6 +28,31 @@ module Grammar =
         satisfy System.Char.IsWhiteSpace "whitespace" |> many1 |> ignoreP
     let whitespace =
         many1 (whitespaceChars <|> comment) |> ignoreP
+    let numberLiteral = 
+        let digits = many1 parseDigit |>> (List.toArray >> System.String)
+        parser {
+            match! opt (pchar '.' >>. digits) with 
+            | Some fraction -> 
+                return fraction |> sprintf ".%s"|> FloatLiteral
+            | None -> 
+                let! prefix = digits
+                match! opt (pchar '.' >>. digits) with 
+                | Some fraction -> 
+                    return fraction |> sprintf "%s.%s" prefix |>FloatLiteral
+                | None -> return prefix |> IntegerLiteral
+                
+        } .>> (opt whitespace) 
+    let stringLiteral = 
+        let nonDoubleQuote = satisfy (fun c -> c <> '\"') "notDoubleQuote"
+        let insideString = many nonDoubleQuote |>> (List.toArray >> System.String)
+        parser {
+            do! pchar '\"' |> ignoreP
+            let! str = insideString
+            do! pchar '\"' |> ignoreP
+            return (str : string)
+        } .>> (opt whitespace) 
+
+
 
     let FUNCTION = pString "FUNCTION" .>> (opt whitespace) |> ignoreP
     let PROGRAM = pString "PROGRAM" .>> (opt whitespace) |> ignoreP
@@ -135,7 +137,6 @@ module Grammar =
 
     let parenExpression = LPAREN >>. expr .>> RPAREN 
 
-
     let expr_list = sepBy expr COMMA
 
     let call_expr = 
@@ -150,22 +151,25 @@ module Grammar =
 
     let primary = parenExpression <|> call_expr <|> numberLiteral
 
-    let rec factor = 
-        parser {
-            let! left = primary
-            match! opt ((MULOP <|> DIVOP) .>>. factor) with 
-            | None -> return left  
-            | Some (op,right) -> return MulExpr(op,left,right)
-        }
+    let factor =
+        let rec factor reciprocal = 
+            parser {
+                let! left = if reciprocal then primary |>> ReciprocalExpr else primary
+                match! opt (((MULOP >>. returnP false) <|> (DIVOP >>. returnP true)) >>= factor) with 
+                | None -> return left  
+                | Some (right) -> return MulExpr(left,right)
+            }
+        factor false
 
-    let rec term =
-        parser {
-            let! left = factor
-            match! opt ((ADDOP <|> SUBOP) .>>. term) with 
-            | None -> return left  
-            | Some (op,right) -> return AddExpr(op,left,right)
-        }
-
+    let term =
+        let rec term negate =
+            parser {
+                let! left = if negate then factor |>> NegateExpr else factor
+                match! opt (((ADDOP >>. returnP false) <|> (SUBOP >>. returnP true)) >>= term) with 
+                | None -> return left  
+                | Some (right) -> return AddExpr(left,right)
+            }
+        term false
 
     expr' := term
 
@@ -211,10 +215,8 @@ module Grammar =
 
     let base_stmt = read_stmt <|> write_stmt <|> return_stmt <|> assign_stmt
 
-    
     let condop = 
-        LESSTHENOREQUALOP <|> GREATERTHENOREQUALOP <|> NOTEQUALOP <|> LESSTHENOP <|> GREATERTHENOP <|> EQUALOP
-        
+        LESSTHENOREQUALOP <|> GREATERTHENOREQUALOP <|> NOTEQUALOP <|> LESSTHENOP <|> GREATERTHENOP <|> EQUALOP   
 
     let cond = 
         parser {
@@ -250,7 +252,6 @@ module Grammar =
             do! ENDIF
             return Stmt.If (cond,block,elseBlock)
         }
-
 
     let while_stmt =
         parser {
@@ -318,12 +319,14 @@ module Grammar =
         | ConditionalExpr (o,l,r) ->
             let o = o.ToString()
             sprintf "%s %s %s" (exprToString l) o (exprToString r)
-        | AddExpr (o,l,r) ->
-            let o = o.ToString()
-            sprintf "%s %s %s" (exprToString l) o (exprToString r)
-        | MulExpr (o,l,r) ->
-            let o = o.ToString()
-            sprintf "%s %s %s" (exprToString l) o (exprToString r)
+        | NegateExpr expr ->
+            sprintf "(-%s)" (exprToString expr)
+        | ReciprocalExpr expr ->
+            sprintf "(1/%s)" (exprToString expr)
+        | AddExpr (l,r) ->
+            sprintf "%s + %s" (exprToString l) (exprToString r)
+        | MulExpr (l,r) ->
+            sprintf "%s * %s" (exprToString l) (exprToString r)
         | CallExpr (i,args) ->
             let args = args |> Seq.map exprToString |> String.concat ", "
             sprintf "%s(%s)" i args
@@ -356,8 +359,6 @@ module Grammar =
             sprintf "%sIF (%s)\n%s\n%sELSE\n%s\n%sENDIF" indent (exprToString cond) (bodyToString indent trueBody) indent (bodyToString indent elseBody) indent
         | Stmt.While (cond,body) ->
             sprintf "%sWHILE (%s)\n%s\n%sENDWHILE" indent (exprToString cond) (bodyToString indent body) indent
-
-
 
     let printProgram (p:Program) =
         printfn "PROGRAM %s BEGIN" p.programName

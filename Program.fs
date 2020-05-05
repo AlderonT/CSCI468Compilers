@@ -52,7 +52,7 @@ module Program =
                     printParseTree result
                 match SemanticAnalyzer.populateProgramSymbolTables result with
                 | Error msg -> printfn "%s" msg
-                | Ok newProgram -> genProgram newProgram |> concatInstructions |> writeCodeToFile filename
+                | Ok newProgram -> genProgram newProgram |> concatInstructions |>  writeCodeToFile filename //writeCodeToConsole
             | Failure _ as result ->
                 //printfn "%A" program
                 printfn "Not accepted"
@@ -60,3 +60,9 @@ module Program =
                     printResult result //Print Result is currently broken 
                                        //(showing the top-level element containing an error) keep in mind
         0 // return an integer exit code
+
+        //let a = 3
+        //let b = 30 
+        //let c = -33 
+        //let d = -20 
+        //printfn "%d" ((a+b)*(d+c)-(a+b+c+d)/a)

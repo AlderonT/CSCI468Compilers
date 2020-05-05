@@ -109,6 +109,9 @@ module TinyCode =
     let writeCodeToFile file (code:string)   = 
         System.IO.File.WriteAllText(file,code)
 
+    let writeCodeToConsole (code:string)   = 
+        printfn "%s" code
+
     type CodeBlock =
         {
             instrs: Instruction list
@@ -163,6 +166,150 @@ module TinyCode =
 
     //CODE GEN
 
+    let removeCommonElements (la:'a list) (lb:'a list) =
+        let removeFirstMatching (x:'a) (l:'a List) =
+            let rec loop lst cont =
+                match lst with
+                | [] -> cont []
+                | e :: rest when e = x -> cont rest
+                | h :: rest -> loop rest (fun rs -> h::rs |> cont)
+            loop l id
+        let rec loop (la:_ list) (lb:_ list) =
+            let sa = la |> Set.ofList
+            let sb = lb |> Set.ofList
+            let commonSubset = Set.intersect sa sb
+            if commonSubset.Count = 0 then la,lb
+            else
+                let la',lb' =
+                    commonSubset
+                    |> Seq.fold (fun (la,lb) element -> removeFirstMatching element la, removeFirstMatching element lb) (la,lb)
+                loop la' lb'
+        loop la lb
+
+    let rec (|IntValue|_|) (expr:Expr) =
+        match expr with
+        | IntegerLiteral s -> System.Int32.Parse s |> Some
+        | NegateExpr (IntValue i) -> -i |> Some
+        | _ -> None
+    let rec (|FloatValue|_|) (expr:Expr) =
+        match expr with
+        | FloatLiteral s -> System.Double.Parse s |> Some
+        | NegateExpr (FloatValue f) -> -f |> Some
+        | _ -> None
+    let (|Zero|_|) (expr:Expr) =
+        match expr with
+        | IntValue 0 -> Some ()
+        | FloatValue 0. -> Some()
+        | _ -> None
+    let (|One|_|) (expr:Expr) =
+        match expr with
+        | IntValue 1 -> Some ()
+        | FloatValue 1.0 -> Some()
+        | _ -> None
+
+
+    let rec reduceExpr (expr:Expr) =
+        match expr with
+        | NegateExpr (NegateExpr expr) -> expr
+        | NegateExpr _
+        | ReciprocalExpr _
+        | IntegerLiteral _
+        | FloatLiteral _
+        | Identifer _ -> expr
+        | AddExpr _ as addExpr ->
+            let rec loop expr (literalExpr:Expr option,positives:Expr list,negatives:Expr list) =
+                let addLiteral (litExpr:Expr option) (other:Expr) =
+                    match litExpr, other with
+                    | None, IntValue _ -> Some other
+                    | None, FloatValue _ -> Some other
+                    | Some (IntValue a), IntValue b ->
+                        let c = a+b
+                        if c >= 0 then IntegerLiteral(string c)
+                        else NegateExpr(IntegerLiteral(string  (-c)))
+                        |> Some
+                    | Some (FloatValue a), FloatValue b ->
+                        let c = a+b
+                        if c >= 0. then FloatLiteral(string c)
+                        else NegateExpr(FloatLiteral(string  (-c)))
+                        |> Some
+                    | _ -> failwithf "Can't Add %A to %A" litExpr other                    
+                match expr with
+                | AddExpr (lh,rh) ->
+                    let state =
+                        let lh' = reduceExpr lh
+                        match lh' with
+                        | Zero -> (literalExpr,positives,negatives)
+                        | IntValue _
+                        | FloatValue _ -> (addLiteral literalExpr lh'),positives,negatives
+                        | NegateExpr inner -> literalExpr,positives,inner::negatives
+                        | expr -> literalExpr,expr::positives,negatives
+                    loop rh state
+                | expr ->
+                    let expr' = reduceExpr expr
+                    match expr' with
+                    | Zero -> (literalExpr,positives,negatives)
+                    | IntValue _
+                    | FloatValue _ -> (addLiteral literalExpr expr'),positives,negatives
+                    | NegateExpr inner -> literalExpr,positives,inner::negatives
+                    | expr -> literalExpr,expr::positives,negatives
+            let literalExpr,positives,negatives = loop addExpr (None,[],[])
+            // remove all the common sub expressions
+            let positives,negatives =
+                let p,n = removeCommonElements positives negatives
+                // put list back in declaration order
+                p |> List.rev, n |> List.rev
+            let reduceExprListToAdd (exprs:Expr list) =
+                match exprs with
+                | [] -> failwithf "Shouldn't happen"
+                | [z] -> z
+                | exprs -> exprs |> Seq.reduce (fun lh rh -> AddExpr(lh,rh))
+            let postiveExpr = if positives.Length = 0 then None else positives |> reduceExprListToAdd |> Some
+            let negativeExpr = if negatives.Length = 0 then None else negatives |> reduceExprListToAdd |> NegateExpr |> Some
+            match literalExpr, postiveExpr, negativeExpr with
+            | None, None, None -> failwithf "No expressions in Add, shouldn't ever happen"
+            | Some litExpr, None, None -> litExpr
+            | Some Zero, Some postiveExpr, None
+            | None, Some postiveExpr, None -> postiveExpr
+            | Some Zero, None, Some negativeExpr
+            | None, None, Some negativeExpr -> negativeExpr
+            | Some literalExpr, Some postiveExpr, None -> AddExpr(literalExpr,postiveExpr)
+            | Some literalExpr, None, Some negativeExpr -> AddExpr(literalExpr,negativeExpr)
+            | None, Some postiveExpr, Some negativeExpr
+            | Some Zero, Some postiveExpr, Some negativeExpr -> AddExpr(postiveExpr,negativeExpr)
+            | Some literalExpr, Some postiveExpr, Some negativeExpr -> AddExpr(literalExpr,AddExpr(postiveExpr,negativeExpr))
+        | MulExpr _ as mulExpr ->
+            let rec loop expr (exprs:Expr list) =
+                match expr with
+                | MulExpr (lh,rh) ->
+                    let lh' = reduceExpr lh
+                    match lh' with
+                    | Zero as z -> [z]
+                    | One -> loop rh exprs
+                    | NegateExpr One -> loop (NegateExpr rh) exprs
+                    | expr -> loop rh (expr::exprs)
+                | expr ->
+                    let expr' = reduceExpr expr
+                    match expr' with
+                    | Zero as z -> [z]
+                    | One -> exprs
+                    | expr -> expr::exprs
+            let exprs = loop mulExpr [] |> List.rev
+            match exprs with
+            | [] -> failwithf "Shouldn't Happen"
+            | [z] -> z
+            | exprs ->
+                let negCount = exprs |> Seq.sumBy (function | NegateExpr _ -> 1 | _ -> 0)
+                let simplifiedExpr =
+                    exprs
+                    |> Seq.choose (function | NegateExpr One -> None | NegateExpr inner -> Some inner | expr -> Some expr)
+                    |> Seq.reduce (fun lh rh -> MulExpr(lh,rh))
+                if negCount % 2 = 0 then
+                    // we have a postive result
+                    simplifiedExpr
+                else
+                    NegateExpr simplifiedExpr
+        | expr -> expr
+
     let rec exprToCode (symTable:SymbolTable) (expr:Expr) regNum =
         match expr with 
         | IntegerLiteral i -> 
@@ -187,9 +334,42 @@ module TinyCode =
                         | Decl.Float _ -> VarType.Float
             let instr = Move (Memory n,Register regNum)
             CodeBlock.New [instr] (regNum+1) exprType
-        | AddExpr (op,l,r) ->
-            match op with
-            | Add ->
+        | AddExpr (l,r) ->
+            match l,r with
+            | NegateExpr l, NegateExpr r ->
+                let left = exprToCode symTable l regNum
+                let right = exprToCode symTable r left.nextRegister
+                if left.exprType = right.exprType then
+                    let addInstr =
+                        let args = Register left.nextRegister, Register regNum
+                        match left.exprType with
+                        | VarType.Int -> AddI args
+                        | VarType.Float -> AddR args
+                    let subInstr =
+                        match left.exprType with
+                        | VarType.Int -> SubI (InstructionOperand.IntConstant 0,Register regNum)
+                        | VarType.Float -> SubR (InstructionOperand.FloatConstant 0.0,Register regNum)
+                    let instrs =
+                        left.instrs @ right.instrs @ [addInstr; subInstr]
+                    CodeBlock.New instrs (regNum+1) left.exprType
+                else
+                    failwithf "Attempting to mix types in a math expression"                
+            | NegateExpr d, s
+            | s, NegateExpr d ->
+                let left = exprToCode symTable d regNum
+                let right = exprToCode symTable s left.nextRegister
+                if left.exprType = right.exprType then
+                    let subInstr =
+                        let args = Register left.nextRegister, Register regNum
+                        match left.exprType with
+                        | VarType.Int -> SubI args
+                        | VarType.Float -> SubR args
+                    let instrs =
+                        left.instrs @ right.instrs @ [subInstr]
+                    CodeBlock.New instrs (regNum+1) left.exprType
+                else
+                    failwithf "Attempting to mix types in a math expression"                
+            | l, r ->
                 let left = exprToCode symTable l regNum
                 let right = exprToCode symTable r left.nextRegister
                 if left.exprType = right.exprType then
@@ -203,24 +383,42 @@ module TinyCode =
                     CodeBlock.New instrs (regNum+1) left.exprType
                 else
                     failwithf "Attempting to mix types in a math expression"                
-            | Sub ->
-                // we re-order subtraction so that we can minimize the number of used registers
+        | MulExpr (l,r) ->
+            match l, r with
+            | ReciprocalExpr l, ReciprocalExpr r ->
                 let left = exprToCode symTable l regNum
                 let right = exprToCode symTable r left.nextRegister
                 if left.exprType = right.exprType then
-                    let addInstr =
+                    let mulInstr =
                         let args = Register left.nextRegister, Register regNum
                         match left.exprType with
-                        | VarType.Int -> SubI args
-                        | VarType.Float -> SubR args
+                        | VarType.Int -> MulI args
+                        | VarType.Float -> MulR args
+                    let divInstr =
+                        match left.exprType with
+                        | VarType.Int -> DivI (InstructionOperand.IntConstant 1, Register regNum)
+                        | VarType.Float -> DivR (InstructionOperand.FloatConstant 1.0, Register regNum)
                     let instrs =
-                        left.instrs @ right.instrs @ [addInstr]
+                        left.instrs @ right.instrs @ [mulInstr; divInstr]
                     CodeBlock.New instrs (regNum+1) left.exprType
                 else
-                    failwithf "Attempting to mix types in a math expression"
-        | MulExpr (op,l,r) ->
-            match op with
-            | Mul ->
+                    failwithf "Attempting to mix types in a math expression"                
+            | ReciprocalExpr d, s
+            | s, ReciprocalExpr d ->
+                let left = exprToCode symTable d regNum
+                let right = exprToCode symTable s left.nextRegister
+                if left.exprType = right.exprType then
+                    let divInstr =
+                        let args = Register left.nextRegister, Register regNum
+                        match left.exprType with
+                        | VarType.Int -> DivI args
+                        | VarType.Float -> DivR args
+                    let instrs =
+                        left.instrs @ right.instrs @ [divInstr]
+                    CodeBlock.New instrs (regNum+1) left.exprType
+                else
+                    failwithf "Attempting to mix types in a math expression"                
+            | l, r ->
                 let left = exprToCode symTable l regNum
                 let right = exprToCode symTable r left.nextRegister
                 if left.exprType = right.exprType then
@@ -234,21 +432,24 @@ module TinyCode =
                     CodeBlock.New instrs (regNum+1) left.exprType
                 else
                     failwithf "Attempting to mix types in a math expression"                
-            | Div ->
-                // we re-order subtraction so that we can minimize the number of used registers
-                let left = exprToCode symTable l regNum
-                let right = exprToCode symTable r left.nextRegister
-                if left.exprType = right.exprType then
-                    let mulInstr =
-                        let args = Register left.nextRegister, Register regNum
-                        match left.exprType with
-                        | VarType.Int -> DivI args
-                        | VarType.Float -> DivR args
-                    let instrs =
-                        left.instrs @ right.instrs @ [mulInstr]
-                    CodeBlock.New instrs (regNum+1) left.exprType
-                else
-                    failwithf "Attempting to mix types in a math expression"
+        | NegateExpr inner ->
+            let left = exprToCode symTable inner regNum
+            let subInstr =
+                match left.exprType with
+                | VarType.Int -> SubI (InstructionOperand.IntConstant 0,Register regNum)
+                | VarType.Float -> SubR (InstructionOperand.FloatConstant 0.0,Register regNum)
+            let instrs =
+                left.instrs @ [subInstr]
+            CodeBlock.New instrs (regNum+1) left.exprType
+        | ReciprocalExpr inner ->
+            let left = exprToCode symTable inner regNum
+            let divInstr =
+                match left.exprType with
+                | VarType.Int -> DivI (InstructionOperand.IntConstant 1, Register regNum)
+                | VarType.Float -> DivR (InstructionOperand.FloatConstant 1.0, Register regNum)
+            let instrs =
+                left.instrs @ [divInstr]
+            CodeBlock.New instrs (regNum+1) left.exprType
         | notSupportedYet -> failwithf "%A not supported yet" notSupportedYet
 
     let genStmt (symTable:SymbolTable) (stmt:Stmt) regNum = 
@@ -285,7 +486,7 @@ module TinyCode =
             | Some decl -> 
                 match decl with 
                 | GlobalVariable id -> 
-                    Seq.concat [(exprToCode symTable rh regNum).instrs;[Move ((Register regNum),(Memory lh))]] 
+                    Seq.concat [(exprToCode symTable (reduceExpr rh) regNum).instrs;[Move ((Register regNum),(Memory lh))]] 
                     |> peepholeOptimize
                 | _ -> failwithf "Only Global variables are accepted"
         | _ -> failwithf "Unsupported Operation %A" stmt
@@ -313,14 +514,5 @@ module TinyCode =
         | Some symTbl -> seq {globalDecls; genFuncDeclInstrs symTbl mainFn} |> Seq.concat
         | None -> failwithf "Symbol Table Failed to generate!"
 
-    let testCode = 
-        [
-            Move ((Memory "a"),Register 0)
-            Move ((Memory "b"),Register 1)
-            AddI ((Register 1),Register 0)
-            Move ((Memory "b"),Register 1)
-            Move ((Memory "a"),Register 0)
-            AddI ((Register 1),Register 0)
-        ]
 
     

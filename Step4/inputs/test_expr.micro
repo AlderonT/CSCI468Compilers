@@ -11,7 +11,7 @@ BEGIN
 		b := 2;
 		c := 10;
 		d := 20;
-
+		
 		WRITE (a, newline);
 		WRITE (b, newline);
 		WRITE (c, newline);
@@ -20,6 +20,7 @@ BEGIN
 		WRITE (a, newline);
 		b := a * c;
 		WRITE (b, newline);
+		
 		c := 0 - a + b;
 		WRITE (c, newline);
 		d := 0 - d;

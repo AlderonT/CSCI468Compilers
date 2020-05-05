@@ -164,8 +164,10 @@ module rec AST =
         | FloatLiteral of string
         | Identifer of string
         | ConditionalExpr of op:CondOperators*left:Expr*right:Expr
-        | AddExpr of op:AddOperators*left:Expr*right:Expr
-        | MulExpr of op:MulOperators*left:Expr*right:Expr
+        | AddExpr of left:Expr*right:Expr
+        | MulExpr of left:Expr*right:Expr
+        | NegateExpr of expr:Expr
+        | ReciprocalExpr of expr:Expr
         | CallExpr of id: string * args:Expr list
     
     type Block =
